@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<link rel="icon" type="image/png" href="MOMO.png">
-<link rel="apple-touch-icon" href="MOMO.png">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>가챠 카드 메이커</title>
+<link rel="icon" type="image/png" href="MOMO.png">
+<link rel="apple-touch-icon" href="MOMO.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Gowun+Dodum&family=Inter:wght@400;500;600;700;800&family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -501,11 +501,16 @@
     drawBase(ctx,W,H,R,c);
 
     const cfont=FONTS[font].css;
-    const padB=H*0.052, charSize=Math.max(11,W*0.034), charBase=H-padB;
+    const land=card.dataset.orient==='land';
     const cardName=cardNameIn.value||' ';
-    const cardSize=fitFont(ctx,cardName,cfont,'700',W*0.088,W*0.84);
-    const cardBase=charBase-charSize-12;
-    const starSize=W*0.062, starGap=starSize*0.28, starsY=cardBase-cardSize*0.78-16;
+    const charName=(charNameIn.value||'').toUpperCase();
+    const charSize=12, starSize=24;
+    const cardSize=fitFont(ctx,cardName,cfont,'700',land?27:30,W*0.84);
+    // baselines — mirror the live preview's info-block spacing
+    const charBase=H-28;
+    const cardBase=charBase - charSize*0.85 - 9 - cardSize*0.2;
+    const starsY=cardBase - cardSize*0.85 - 11 - starSize/2;
+    const starGap=starSize*0.28;
 
     const totalW=stars*starSize+(stars-1)*starGap;let sx=W/2-totalW/2+starSize/2;
     for(let i=0;i<stars;i++){
@@ -518,27 +523,35 @@
       sx+=starSize+starGap;
     }
 
+    // card name — soft outer glow + thin outline + white fill (matches preview)
     let cardA=1,cardRise=0;if(st){const np=clamp((st.t-st.nameStart)/0.35);cardA=easeOut(np);cardRise=(1-easeOut(np))*16;}
     const cnx=W/2, cny=cardBase+cardRise;
     ctx.save();ctx.globalAlpha=introA*cardA;ctx.font=`700 ${cardSize}px ${cfont}`;ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.lineJoin='round';ctx.miterLimit=2;
-    // 1) outer glow halo (soft, no stroke)
-    ctx.fillStyle='#ffffff';ctx.shadowColor=c.glowStrong;
-    ctx.shadowBlur=cardSize*0.85;ctx.fillText(cardName,cnx,cny);
-    ctx.shadowBlur=cardSize*1.5;ctx.fillText(cardName,cnx,cny);
+    ctx.fillStyle='#ffffff';
+    ctx.shadowColor=c.glowStrong;ctx.shadowBlur=cardSize*0.5;ctx.fillText(cardName,cnx,cny);
+    ctx.shadowColor=c.glow;ctx.shadowBlur=cardSize*0.95;ctx.fillText(cardName,cnx,cny);
     ctx.shadowBlur=0;
-    // 2) thin crisp outline
-    ctx.lineWidth=Math.max(1.4,cardSize*0.05);ctx.strokeStyle=c.c2;ctx.strokeText(cardName,cnx,cny);
-    // 3) white fill on top
+    ctx.lineWidth=Math.max(1.3,cardSize*0.045);ctx.strokeStyle=c.c2;ctx.strokeText(cardName,cnx,cny);
     ctx.fillStyle='#ffffff';ctx.fillText(cardName,cnx,cny);
     ctx.restore();
 
+    // character name + side decoration lines
     let charA=1,charRise=0;if(st){const cp=clamp((st.t-st.nameStart-0.15)/0.3);charA=easeOut(cp);charRise=(1-easeOut(cp))*10;}
-    const charName=(charNameIn.value||'').toUpperCase();
-    ctx.save();ctx.globalAlpha=introA*charA;ctx.font=`600 ${charSize}px 'Inter','Noto Sans KR',sans-serif`;
-    if('letterSpacing'in ctx)ctx.letterSpacing=Math.round(charSize*0.26)+'px';
-    ctx.textAlign='center';ctx.fillStyle=c.name;ctx.shadowColor=c.glowStrong;ctx.shadowBlur=charSize*0.9;
-    ctx.fillText(charName,W/2,charBase+charRise);
-    if('letterSpacing'in ctx)ctx.letterSpacing='0px';ctx.restore();
+    const chy=charBase+charRise, spc=Math.round(charSize*0.26);
+    ctx.save();ctx.globalAlpha=introA*charA;ctx.font=`600 ${charSize}px 'Inter','Noto Sans KR',sans-serif`;ctx.textAlign='center';ctx.textBaseline='alphabetic';
+    const baseW=ctx.measureText(charName).width, textW=baseW+spc*Math.max(0,charName.trim().length-1);
+    if('letterSpacing'in ctx)ctx.letterSpacing=spc+'px';
+    ctx.fillStyle=c.name;ctx.shadowColor=c.glowStrong;ctx.shadowBlur=charSize*0.7;ctx.fillText(charName,W/2,chy);
+    if('letterSpacing'in ctx)ctx.letterSpacing='0px';ctx.shadowBlur=0;
+    if(charName.trim().length){
+      const lineY=chy-charSize*0.32, len=18, gap=9, tL=W/2-textW/2, tR=W/2+textW/2;
+      ctx.globalAlpha=introA*charA*0.6;ctx.lineWidth=1.4;
+      let gl=ctx.createLinearGradient(tL-gap-len,0,tL-gap,0);gl.addColorStop(0,'rgba(0,0,0,0)');gl.addColorStop(1,c.name);
+      ctx.strokeStyle=gl;ctx.beginPath();ctx.moveTo(tL-gap-len,lineY);ctx.lineTo(tL-gap,lineY);ctx.stroke();
+      let gr=ctx.createLinearGradient(tR+gap,0,tR+gap+len,0);gr.addColorStop(0,c.name);gr.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.strokeStyle=gr;ctx.beginPath();ctx.moveTo(tR+gap,lineY);ctx.lineTo(tR+gap+len,lineY);ctx.stroke();
+    }
+    ctx.restore();
     ctx.restore();
 
     ctx.save();ctx.globalAlpha=introA;ctx.translate(W/2,H/2);ctx.scale(introS,introS);ctx.translate(-W/2,-H/2);drawFrame(ctx,W,H,R,c);ctx.restore();
