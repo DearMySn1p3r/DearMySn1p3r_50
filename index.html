@@ -151,6 +151,8 @@ textarea.inp{height:auto;min-height:64px;padding:10px 11px;line-height:1.55;resi
 .gc-tt{font-size:10px;font-weight:500;letter-spacing:-.01em;margin-left:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;text-shadow:0 1px 6px rgba(40,20,70,.5)}
 .gc-stars{position:absolute;left:28px;top:22px;line-height:0;pointer-events:none}
 .stars-svg{overflow:visible;filter:drop-shadow(0 0 3px var(--glr)) drop-shadow(0 1px 1px rgba(60,30,10,.18))}
+.gcard.post .stars-svg{animation:prism 3.2s linear infinite}
+@keyframes prism{from{filter:hue-rotate(0deg) drop-shadow(0 0 2px #fff) drop-shadow(0 0 6px rgba(190,170,255,.85))}to{filter:hue-rotate(360deg) drop-shadow(0 0 2px #fff) drop-shadow(0 0 6px rgba(190,170,255,.85))}}
 .gc-plate{position:absolute;right:-14px;bottom:24px;width:300px;height:38px;transform:skewX(-14deg);background:rgba(255,255,255,.96);color:#2b2533;pointer-events:none;box-shadow:0 10px 22px -14px rgba(40,20,70,.55)}
 .gcard[data-orient="port"] .gc-plate{width:260px}
 .gc-plate::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--a)}
@@ -577,10 +579,16 @@ details.more summary::-webkit-details-marker{display:none}
 
         <div class="panel" data-p="lines">
           <div class="sec">
-            <div class="sec-title">대사</div>
+            <div class="sec-title">각성 전 대사</div>
             <div class="note">뽑을 때 일러가 나오기 전에 한 줄씩 랜덤으로 떠요.</div>
-            <div class="lines" id="lineList"></div>
-            <button class="addline" id="addLine">+ 대사 추가</button>
+            <div class="lines" id="lineList" data-k="lines"></div>
+            <button class="addline" data-add="lines">+ 대사 추가</button>
+          </div>
+          <div class="sec">
+            <div class="sec-title">각성 후 대사 ✦</div>
+            <div class="note">각성 후로 넘길 때 각성 일러보다 먼저 떠요.</div>
+            <div class="lines" id="lineListPost" data-k="linesPost"></div>
+            <button class="addline" data-add="linesPost">+ 대사 추가</button>
           </div>
         </div>
 
@@ -746,13 +754,14 @@ $('#svExt').addEventListener('click',async()=>{const u=location.href;
   try{await navigator.clipboard.writeText(u);toast('주소를 복사했어요 — 크롬이나 사파리에 붙여넣어 주세요');}catch(e){toast('메뉴(⋮)에서 "다른 브라우저로 열기"를 눌러 주세요');}});
 const fname=c=>((c.char||'')+(c.name?'_'+c.name:'')||'gacha-card').replace(/[\\/:*?"<>|]+/g,'').trim()||'gacha-card';
 const artFor=(c,sd)=>c.art[sd]||c.art.pre||c.art.post||null;
-const pickLine=c=>{const l=(c.lines||[]).map(s=>s.trim()).filter(Boolean);return l.length?l[Math.floor(Math.random()*l.length)]:'';};
+const linesOf=(c,sd)=>((sd==='post'?c.linesPost:c.lines)||[]).map(s=>String(s).trim()).filter(Boolean);
+const pickLine=(c,sd)=>{const l=linesOf(c,sd);return l.length?l[Math.floor(Math.random()*l.length)]:'';};
 const dispName=c=>c.char||'캐릭터 A',cardTitle=c=>c.name||'카드 이름';
 function fitFont(ctx,text,family,weight,maxSize,maxWidth){let s=maxSize;for(;s>=12;s--){ctx.font=`${weight} ${s}px ${family}`;if(ctx.measureText(text).width<=maxWidth)break;}return s;}
 let svgN=0;
-function starsSVG(n,c){const k=col(c),id='pg'+(++svgN),size=21,gap=-1,W=n*(size+gap)+4,H=size+8,s=size/24;let p='';
+function starsSVG(n,c,post){const k=col(c),id='pg'+(++svgN),size=21,gap=-1,W=n*(size+gap)+4,H=size+8,s=size/24;let p='';
   for(let i=0;i<n;i++)p+=`<g transform="translate(${i*(size+gap)} 6)"><g class="st" style="--d:${(i*.07).toFixed(2)}s"><g transform="scale(${s})"><path d="${STAR}" fill="url(#${id})" stroke="url(#${id})" stroke-width="1.8" stroke-linejoin="round"/></g></g></g>`;
-  return`<svg class="stars-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(k.starTop,'#ffffff',.55)}"/><stop offset=".5" stop-color="${k.starTop}"/><stop offset="1" stop-color="${k.starBottom}"/></linearGradient></defs>${p}</svg>`;}
+  return`<svg class="stars-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs>${post?`<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc4e4"/><stop offset=".28" stop-color="#ffe9a3"/><stop offset=".52" stop-color="#c4f5d6"/><stop offset=".76" stop-color="#a9dcff"/><stop offset="1" stop-color="#d4c2ff"/></linearGradient>`:`<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(k.starTop,'#ffffff',.55)}"/><stop offset=".5" stop-color="${k.starTop}"/><stop offset="1" stop-color="${k.starBottom}"/></linearGradient>`}</defs>${p}</svg>`;}
 
 /* ---------- storage ---------- */
 const DB=(()=>{const mem={cards:new Map(),meta:null};let memMode=false,dbp=null;
@@ -774,7 +783,7 @@ function renderGems(){$('#gemVal').textContent=fmt(meta.gems);}
 $('#gemAdd').addEventListener('click',()=>{meta.gems+=30000;saveMeta();renderGems();if(view==='gacha')renderGacha();toast('💎 30,000 충전했어요');});
 function migrate(c){
   if(!c.colors){const a=c.colorA||'#ffb6d9',b=c.colorB||'#a78bfa';c.colors={accent:mix(a,b,.25),accent2:b,starTop:'#ffd970',starBottom:'#f2a33a',glow:'#f0aa3c'};}
-  if(!Array.isArray(c.lines))c.lines=[];c.art=c.art||{pre:null,post:null};if(!c.orient)c.orient='land';if(!FONTS[c.font])c.font='paperlogy';if(c.en==null)c.en='';if(!c.stars)c.stars=3;return c;}
+  if(!Array.isArray(c.lines))c.lines=[];if(!Array.isArray(c.linesPost))c.linesPost=[];c.art=c.art||{pre:null,post:null};if(!c.orient)c.orient='land';if(!FONTS[c.font])c.font='paperlogy';if(c.en==null)c.en='';if(!c.stars)c.stars=3;return c;}
 
 /* ---------- theme ---------- */
 $('#themeBtn').addEventListener('click',()=>{const d=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=d;try{localStorage.setItem('gcm-theme',d);}catch(e){}});
@@ -799,8 +808,8 @@ function makeCard(c,sd,edit){const el=document.createElement('div');el.className
   updateCard(el,c,sd,edit);return el;}
 function updateCard(el,c,sd,edit){const {W,H}=SIZE[c.orient],f=fontOf(c);el.dataset.orient=c.orient;el.dataset.w=W;el.dataset.h=H;setVars(el,c);
   $('.gc-bg',el).style.background=cardBase(c);
-  el.classList.toggle('post',sd==='post'&&(edit||!!c.art.post));
-  $('.gc-stars',el).innerHTML=starsSVG(c.stars,c);
+  const isPost=sd==='post'&&(edit||!!c.art.post);el.classList.toggle('post',isPost);
+  $('.gc-stars',el).innerHTML=starsSVG(c.stars,c,isPost);
   $('.gc-rar',el).textContent=RAR[c.stars]||'R';
   const tt=$('.gc-tt',el);tt.textContent=cardTitle(c);tt.hidden=!tt.textContent;
   const nm=dispName(c),en=(c.en||'').trim(),enEl=$('.gc-en',el);enEl.textContent=en;enEl.hidden=!en;
@@ -811,7 +820,7 @@ function updateCard(el,c,sd,edit){const {W,H}=SIZE[c.orient],f=fontOf(c);el.data
 
 /* ================= STUDIO ================= */
 const blankCard=()=>({id:null,name:'',char:'',en:'',stars:5,orient:'land',font:'paperlogy',colors:clone(PRESETS[0].c),
-  lines:[''],art:{pre:null,post:null},spark:true});
+  lines:[''],linesPost:[''],art:{pre:null,post:null},spark:true});
 let draft=blankCard(),side='pre',view='studio';
 const pvFit=$('#pvFit'),pvCard=makeCard(draft,side,true);pvFit.appendChild(pvCard);observeFit(pvFit);
 const pvArt=()=>$('.gc-art',pvCard);
@@ -899,13 +908,14 @@ Object.entries(FONTS).forEach(([k,f])=>{const b=document.createElement('button')
   b.addEventListener('click',()=>{draft.font=k;syncForm();refreshPreview();});$('#fonts').appendChild(b);});
 $('#tglSpark').addEventListener('click',()=>{draft.spark=draft.spark===false;syncForm();});
 /* lines */
-function renderLines(){const L=$('#lineList');L.innerHTML='';if(!draft.lines.length)draft.lines=[''];
-  draft.lines.forEach((t,i)=>{const d=document.createElement('div');d.className='line-item';
-    d.innerHTML=`<span>${String(i+1).padStart(2,'0')}</span><textarea rows="1" maxlength="120" placeholder="대사를 입력하세요" aria-label="대사 ${i+1}"></textarea><button aria-label="대사 삭제">×</button>`;
+function renderLineList(key,L){L.innerHTML='';if(!Array.isArray(draft[key]))draft[key]=[];if(!draft[key].length)draft[key]=[''];
+  draft[key].forEach((t,i)=>{const d=document.createElement('div');d.className='line-item';
+    d.innerHTML=`<span>${String(i+1).padStart(2,'0')}</span><textarea rows="1" maxlength="120" placeholder="${key==='linesPost'?'각성 후 대사를 입력하세요':'대사를 입력하세요'}" aria-label="대사 ${i+1}"></textarea><button aria-label="대사 삭제">×</button>`;
     const ta=$('textarea',d);ta.value=t;const grow=()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';};
-    ta.addEventListener('input',()=>{draft.lines[i]=ta.value;grow();});requestAnimationFrame(grow);
-    $('button',d).addEventListener('click',()=>{draft.lines.splice(i,1);renderLines();});L.appendChild(d);});}
-$('#addLine').addEventListener('click',()=>{draft.lines.push('');renderLines();const t=$$('#lineList textarea');t[t.length-1].focus();});
+    ta.addEventListener('input',()=>{draft[key][i]=ta.value;grow();});requestAnimationFrame(grow);
+    $('button',d).addEventListener('click',()=>{draft[key].splice(i,1);renderLineList(key,L);});L.appendChild(d);});}
+function renderLines(){renderLineList('lines',$('#lineList'));renderLineList('linesPost',$('#lineListPost'));}
+$$('[data-add]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.add,L=$(`.lines[data-k="${k}"]`);draft[k].push('');renderLineList(k,L);const t=$$('textarea',L);t[t.length-1].focus();}));
 /* actions */
 $('#newCard').addEventListener('click',()=>{loadDraft(blankCard(),'pre');toast('새 카드를 시작했어요');});
 $('#resetCard').addEventListener('click',()=>{if(!confirm('지금 카드의 이미지 · 텍스트 · 대사 · 색을 모두 비울까요?'))return;const id=draft.id,cr=draft.created;loadDraft(Object.assign(blankCard(),{id,created:cr}),'pre');toast(id?'초기화했어요 — 저장해야 반영돼요':'초기화했어요');});
@@ -914,7 +924,7 @@ $('#delCard').addEventListener('click',async()=>{const c=cards.find(x=>x.id===dr
 $('#saveBtn').addEventListener('click',async()=>{
   if(view!=='studio'){setView('studio');return;}
   if(!draft.art.pre&&!draft.art.post){toast('이미지를 하나 이상 올려주세요');return;}
-  draft.lines=draft.lines.map(s=>s.trim()).filter(Boolean);
+  draft.lines=draft.lines.map(s=>s.trim()).filter(Boolean);draft.linesPost=(draft.linesPost||[]).map(s=>s.trim()).filter(Boolean);
   const isNew=!draft.id;if(isNew)draft.id=uid();draft.updated=Date.now();if(!draft.created)draft.created=draft.updated;
   const c=clone(draft);try{await DB.put(c);}catch(e){console.error(e);if(isNew)draft.id=null;toast('저장 공간이 부족해요 — 이미지 크기를 줄여 주세요');return;}
   const i=cards.findIndex(x=>x.id===c.id);if(i>=0)cards[i]=c;else cards.push(c);syncForm();toast(isNew?'✦ 컬렉션에 추가했어요':'변경사항을 저장했어요');});
@@ -961,7 +971,7 @@ function openDetail(c){D.c=c;D.side=c.art.pre?'pre':'post';D.li=0;$('#modal').cl
 function closeDetail(){$('#modal').classList.remove('show');clearFits($('#modal'));}
 function renderDetail(){const c=D.c,f=$('#dFit');clearFits(f.parentNode);f.innerHTML='';f.appendChild(makeCard(c,D.side));observeFit(f);
   $$('#dSide button').forEach(b=>{b.classList.toggle('on',b.dataset.s===D.side);b.disabled=!c.art[b.dataset.s];});
-  const lines=(c.lines||[]).filter(Boolean),isPU=meta.banner.pickup.includes(c.id);
+  const lines=linesOf(c,D.side),isPU=meta.banner.pickup.includes(c.id);
   $('#dRight').innerHTML=`<div><div class="dst">${'★'.repeat(c.stars)} <span style="font-family:Outfit;font-size:11px;letter-spacing:.2em;color:var(--muted)">${RAR[c.stars]}</span></div><h3>${esc(dispName(c))}</h3><div class="dsub">${esc(cardTitle(c))}</div></div>
    <div class="dtags">${ownChip(c)}${isPU?'<span class="chip pu">PICK UP</span>':''}${c.art.post?'<span class="chip">각성 일러 ✦</span>':''}</div>
    ${lines.length?`<div class="dline" id="dLine">${esc(lines[D.li%lines.length])}<small>${D.li%lines.length+1} / ${lines.length} · 눌러서 다음 대사</small></div>`:'<div class="note">등록된 대사가 없어요.</div>'}
@@ -1077,7 +1087,7 @@ function setPhase(ph){P.phase=ph;$$('.phase',pull).forEach(e=>e.classList.toggle
 function runPull(list,news,o={}){P.list=list.map(migrate);P.news=news;P.i=0;P.preview=!!o.preview;P.n=o.n||list.length;
   const b=$('#pbox');b.style.animation='none';void b.offsetWidth;b.style.animation='';pull.classList.add('show');showCard(0);}
 function closePull(){stopTyping();pull.classList.remove('show');clearFits($('#res'));$('#res').innerHTML='';stage.innerHTML='';refreshViews();}
-function showCard(i){P.i=i;const c=P.list[i];P.side=c.art.pre?'pre':'post';P.line=pickLine(c);if(P.line)showIntro();else showReveal();}
+function showCard(i){P.i=i;const c=P.list[i];P.side=c.art.pre?'pre':'post';P.line=pickLine(c,P.side);if(P.line)showIntro();else showReveal();}
 function showIntro(){const c=P.list[P.i],k=col(c),ph=$('#ph-intro');ph.classList.remove('done');
   ph.style.setProperty('--ia',k.accent);ph.style.setProperty('--iag',rgba(k.accent,.24));setPhase('intro');
   $('#iDots').innerHTML=P.list.length>1?P.list.map((_,j)=>`<i class="${j<P.i?'done':j===P.i?'cur':''}"></i>`).join(''):'';
@@ -1090,7 +1100,7 @@ function stopTyping(){if(typer){clearInterval(typer.t);typer=null;}}
 function introAdvance(){if(Date.now()-P.t0<250)return;if(typer&&!typer.done){typer.finish();return;}showReveal();}
 function showReveal(){const c=P.list[P.i],multi=P.list.length>1,last=P.i+1>=P.list.length;stopTyping();setPhase('reveal');
   $('#rvCount').innerHTML=multi?`${String(P.i+1).padStart(2,'0')} <span>/ ${String(P.list.length).padStart(2,'0')}</span>`:(P.preview?'PREVIEW':'SCOUT');
-  $('#rvNew').hidden=!P.news[P.i];$('#rvSkip').hidden=!multi||last;$('#rvLine').hidden=!pickLine(c);
+  $('#rvNew').hidden=!P.news[P.i];$('#rvSkip').hidden=!multi||last;$('#rvLine').hidden=!pickLine(c,P.side);
   $('#rvNext').textContent=last?(P.preview?'닫기':'결과 보기'):'다음 카드 →';
   stage.innerHTML='';const el=makeCard(c,P.side);el.classList.add('play');stage.appendChild(el);fit(stage);syncAwk();P.t0=Date.now();}
 function syncAwk(){const c=P.list[P.i],g=$('#pAwk');g.hidden=!(c.art.pre&&c.art.post);$$('button',g).forEach(b=>b.classList.toggle('on',b.dataset.s===P.side));}
@@ -1111,9 +1121,10 @@ $('#pSkip').addEventListener('click',()=>{if(P.list.length>1)finish();else showR
 stage.addEventListener('click',()=>{const el=$('.gcard',stage);if(el&&el.classList.contains('play')&&Date.now()-P.t0<1700)el.classList.remove('play');});
 $('#rvNext').addEventListener('click',next);
 $('#rvSkip').addEventListener('click',finish);
-$('#rvLine').addEventListener('click',()=>{const l=pickLine(P.list[P.i]);if(l){P.line=l;showIntro();}});
+$('#rvLine').addEventListener('click',()=>{const l=pickLine(P.list[P.i],P.side);if(l){P.line=l;showIntro();}});
 $('#pClose').addEventListener('click',()=>{if(P.preview)closePull();else finish();});
 $('#pAwk').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===P.side)return;P.side=b.dataset.s;
+  const ln=pickLine(P.list[P.i],P.side);if(ln){P.line=ln;showIntro();return;}
   const el=$('.gcard',stage);if(el){updateCard(el,P.list[P.i],P.side);el.classList.remove('play','swap');void el.offsetWidth;el.classList.add('swap');}syncAwk();});
 document.addEventListener('keydown',e=>{const modal=$('#modal').classList.contains('show'),open=pull.classList.contains('show');
   if(e.key==='Escape'&&$('#saveModal').classList.contains('show')){$('#saveModal').classList.remove('show');return;}
@@ -1134,13 +1145,14 @@ function spaced(ctx,text,x,y,sp,align){const chars=[...text];const w=chars.reduc
   ctx.textAlign='left';chars.forEach(ch=>{ctx.fillText(ch,cx,y);cx+=ctx.measureText(ch).width+sp;});return w;}
 const TAN=Math.tan(14*Math.PI/180),F_UI="'Paperlogy','Pretendard Variable',Pretendard,'Noto Sans KR',sans-serif",F_EN="'Outfit',sans-serif";
 function para(ctx,x,y,w,h){const o=h/2*TAN;ctx.beginPath();ctx.moveTo(x+o,y);ctx.lineTo(x+w+o,y);ctx.lineTo(x+w-o,y+h);ctx.lineTo(x-o,y+h);ctx.closePath();}
-function drawStars(ctx,c,x0,y0,n,st){const k=col(c),size=21,gap=-1,ds=ctx.getTransform().a;
+function drawStars(ctx,c,x0,y0,n,st,post){const k=col(c),size=21,gap=-1,ds=ctx.getTransform().a;
   for(let i=0;i<n;i++){let a=1,pop=1;
     if(st){const t=st.t-st.starStart-i*st.stagger;a=clamp(t/.18);const ap=clamp(t/.3);pop=ap<=0?0:ap>=1?1:1+.3*Math.sin(ap*Math.PI);}
     if(a<=.001)continue;const x=x0+i*(size+gap),y=y0;
     ctx.save();ctx.globalAlpha*=a;ctx.translate(x+size/2,y+size/2);ctx.scale(pop*size/24,pop*size/24);ctx.translate(-12,-12);
-    const g=ctx.createLinearGradient(0,2.6,0,21.4);g.addColorStop(0,mix(k.starTop,'#ffffff',.55));g.addColorStop(.5,k.starTop);g.addColorStop(1,k.starBottom);
-    ctx.lineJoin='round';ctx.fillStyle=g;ctx.strokeStyle=g;ctx.lineWidth=1.8;ctx.shadowColor=rgba(k.glow,.7);ctx.shadowBlur=5*ds;ctx.fill(starP);ctx.stroke(starP);ctx.shadowColor='transparent';ctx.fill(starP);ctx.stroke(starP);ctx.restore();
+    let g;if(post){const ph=(st&&st.hue!=null?st.hue:(st?st.t:0))*2.2+i*.7,cx=Math.cos(ph)*12,cy=Math.sin(ph)*12;g=ctx.createLinearGradient(12-cx,12-cy,12+cx,12+cy);['#ffc4e4','#ffe9a3','#c4f5d6','#a9dcff','#d4c2ff'].forEach((h,q)=>g.addColorStop(q/4,h));}
+    else{g=ctx.createLinearGradient(0,2.6,0,21.4);g.addColorStop(0,mix(k.starTop,'#ffffff',.55));g.addColorStop(.5,k.starTop);g.addColorStop(1,k.starBottom);}
+    ctx.lineJoin='round';ctx.fillStyle=g;ctx.strokeStyle=g;ctx.lineWidth=1.8;ctx.shadowColor=post?'rgba(200,180,255,.95)':rgba(k.glow,.7);ctx.shadowBlur=(post?7:5)*ds;ctx.fill(starP);ctx.stroke(starP);ctx.shadowColor='transparent';ctx.fill(starP);ctx.stroke(starP);ctx.restore();
     if(st&&c.spark!==false){const age=st.t-st.starStart-i*st.stagger;if(age>0&&age<.5){const q=age/.5;for(let j=0;j<4;j++){const ang=j/4*Math.PI*2+i,d=lerp(3,size*.9,easeOut(q));spark(ctx,x+size/2+Math.cos(ang)*d,y+size/2+Math.sin(ang)*d,size*.28*(1-q),'#ffffff',(1-q)*.8);}}}}}
 function enWidth(ctx,t,size,sp,w,fam){ctx.font=`${w||500} ${size}px ${fam||F_EN}`;const a=[...t];return a.reduce((s,ch)=>s+ctx.measureText(ch).width,0)+sp*Math.max(0,a.length-1);}
 function drawCard(ctx,c,im,art,sd,st){const {W,H}=SIZE[c.orient],k=col(c),land=c.orient==='land',R=14,post=sd==='post'&&!!c.art.post,f=fontOf(c),ds=ctx.getTransform().a;
@@ -1164,7 +1176,7 @@ function drawCard(ctx,c,im,art,sd,st){const {W,H}=SIZE[c.orient],k=col(c),land=c
   chips.forEach(ch=>{para(ctx,lx,9,ch.w,14);ctx.fillStyle=ch.bg;ctx.fill();ctx.fillStyle=ch.fg;ctx.font=`700 9.5px ${F_UI}`;ctx.textBaseline='middle';spaced(ctx,ch.t,lx+ch.w/2,16.5,.19,'center');lx+=ch.w+6;});lx+=tt?2:0;
   if(tt){ctx.save();ctx.font=`500 10px ${F_UI}`;ctx.fillStyle='#fff';ctx.textBaseline='middle';ctx.textAlign='left';ctx.shadowColor='rgba(40,20,70,.5)';ctx.shadowBlur=6*ds;ctx.fillText(tt,lx,16.5);ctx.restore();}
   ctx.restore();
-  drawStars(ctx,c,28,28,c.stars,st);
+  drawStars(ctx,c,28,28,c.stars,st,post);
   // plate
   const PW=land?300:260,PH=38,px=W+14-PW,cy=H-24-PH/2;let pA=1,pdx=0;
   if(st){const q=clamp((st.t-st.nameStart)/.45);pA=easeOut(q);pdx=(1-easeOut(q))*40;}
@@ -1231,20 +1243,20 @@ async function exportGIF(c,sd){c=migrate(c);if(typeof GIF==='undefined'){toast('
     const S=Q.px/Math.max(W,H),cv=document.createElement('canvas');cv.width=Math.round(W*S);cv.height=Math.round(H*S);const ctx=cv.getContext('2d');ctx.imageSmoothingQuality='high';
     const both=!!(c.art.pre&&c.art.post),awk=gifOpt.awk&&both,firstSide=awk?'pre':sd;
     const artA=artFor(c,firstSide),imA=await getImg(artA),artB=awk?c.art.post:null,imB=awk?await getImg(artB):null;
-    const line=gifOpt.line?((c.lines||[]).map(x=>String(x).trim()).filter(Boolean)[0]||''):'';
+    const line=gifOpt.line?(linesOf(c,firstSide)[0]||''):'',line2=gifOpt.line&&awk?(linesOf(c,'post')[0]||''):'';
     const deco=.2,starStart=.4,stagger=.08,nameStart=starStart+(c.stars-1)*stagger+.2,shineStart=nameStart+.55;
     const segs=[];let T=0;
     if(line){const d=.35+[...line].length*TYPE_CPS+1.4;segs.push({k:'dlg',s:T,e:T+d});T+=d;}
     {const d=shineStart+.6+(awk?.7:1.1);segs.push({k:'card',s:T,e:T+d});T+=d;}
-    if(awk){const d=2.1;segs.push({k:'awk',s:T,e:T+d});T+=d;}
+    if(awk){if(line2){const d=.35+[...line2].length*TYPE_CPS+1.4;segs.push({k:'dlg2',s:T,e:T+d});T+=d;}const d=2.1;segs.push({k:'awk',s:T,e:T+d});T+=d;}
     const fps=Q.fps,frames=Math.max(2,Math.round(T*fps)),delay=Math.round(1000/fps);
     const gif=new GIF({workers:2,quality:Q.q,width:cv.width,height:cv.height,workerScript:wurl,dither:false,background:'#ffffff'});
     for(let f=0;f<frames;f++){const t=f/fps,sg=segs.find(x=>t<x.e)||segs[segs.length-1],lt=t-sg.s;
       ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);ctx.setTransform(S,0,0,S,0,0);
-      if(sg.k==='dlg')drawDialogue(ctx,c,W,H,line,lt,sg.e-sg.s);
+      if(sg.k==='dlg'||sg.k==='dlg2')drawDialogue(ctx,c,W,H,sg.k==='dlg'?line:line2,lt,sg.e-sg.s);
       else if(sg.k==='card'){drawCard(ctx,c,imA,artA,firstSide,{t:lt,deco,starStart,stagger,nameStart,introA:clamp(lt/.3*1.3),introS:lerp(.96,1,easeOut(clamp(lt/.35))),shine:(lt>=shineStart&&lt<=shineStart+.6)?(lt-shineStart)/.6:-1});
         if(!spk){}}
-      else{drawCard(ctx,c,imB,artB,'post',{t:99,deco:0,starStart:0,stagger:0,nameStart:0,introA:1,introS:1,shine:(lt>=.2&&lt<=.9)?(lt-.2)/.7:-1});
+      else{drawCard(ctx,c,imB,artB,'post',{t:99,deco:0,starStart:0,stagger:0,nameStart:0,introA:1,introS:1,hue:lt,shine:(lt>=.2&&lt<=.9)?(lt-.2)/.7:-1});
         const fl=1-clamp(lt/.45);if(fl>0){ctx.save();ctx.globalAlpha=fl*.9;rr(ctx,0,0,W,H,16);ctx.fillStyle='#ffffff';ctx.fill();ctx.restore();}}
       gif.addFrame(ctx,{copy:true,delay:f===frames-1?delay+1200:delay});bBar.style.width=Math.round((f+1)/frames*45)+'%';if(f%3===0)await new Promise(r=>setTimeout(r));}
     $('#bTitle').textContent='GIF 만드는 중…';$('#bSub').textContent='인코딩하고 있어요';
@@ -1262,7 +1274,7 @@ function genArt(k,seed,post,glyph){const W=1080,H=720,cv=document.createElement(
 async function addSamples(){busy(true,'샘플 카드 만드는 중…','잠시만요');await document.fonts.ready;
   const L=['대사를 입력하세요.','두 번째 대사를 입력하세요.'],S=[[6,0,'paperlogy'],[5,2,'paperlogy'],[5,1,'paperlogy'],[4,4,'paperlogy'],[3,3,'paperlogy'],[3,2,'paperlogy']].map((x,i)=>{const a='ABCDEF'[i];return['캐릭터 '+a,'','카드 이름',x[0],x[1],x[2],L.slice(),a];});
   for(let i=0;i<S.length;i++){const [char,en,name,stars,pi,font,lines,gl]=S[i],k=clone(PRESETS[pi].c);
-    const c={id:uid(),char,en,name,stars,orient:'land',font,colors:k,lines,spark:true,art:{pre:genArt(k,i*131+7,false,gl),post:genArt(k,i*131+7,true,gl)},created:Date.now(),updated:Date.now()};
+    const c={id:uid(),char,en,name,stars,orient:'land',font,colors:k,lines,linesPost:['각성 후 대사를 입력하세요.'],spark:true,art:{pre:genArt(k,i*131+7,false,gl),post:genArt(k,i*131+7,true,gl)},created:Date.now(),updated:Date.now()};
     await DB.put(c);cards.push(c);bBar.style.width=Math.round((i+1)/S.length*100)+'%';await new Promise(r=>setTimeout(r,30));}
   if(!meta.banner.pickup.length){const h=[...cards].sort((a,b)=>b.stars-a.stars)[0];if(h)meta.banner.pickup=[h.id];}saveMeta();
   busy(false);refreshViews();toast('샘플 카드 6장을 넣었어요 ✦');}
