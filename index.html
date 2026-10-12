@@ -148,7 +148,8 @@ textarea.inp{height:auto;min-height:64px;padding:10px 11px;line-height:1.55;resi
 .gc-awk{display:none;color:var(--a)}
 .gc-awk::before{background:#fff}
 .gcard.post .gc-awk{display:block}
-.gc-tt{font-size:10px;font-weight:500;letter-spacing:-.01em;margin-left:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;text-shadow:0 1px 6px rgba(40,20,70,.5)}
+.gc-tt{font-size:10px;font-weight:500;letter-spacing:-.01em;margin-left:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px;text-shadow:0 1px 6px rgba(40,20,70,.5)}
+.gcard[data-orient="port"] .gc-tt{max-width:200px}
 .gc-stars{position:absolute;left:28px;top:22px;line-height:0;pointer-events:none}
 .stars-svg{overflow:visible;filter:drop-shadow(0 0 3px var(--glr)) drop-shadow(0 1px 1px rgba(60,30,10,.18))}
 .gcard.post .stars-svg{animation:prism 3.2s linear infinite}
@@ -544,7 +545,7 @@ details.more summary::-webkit-details-marker{display:none}
             <div class="sec-title">텍스트</div>
             <div class="field"><label class="lbl" for="charIn">캐릭터 이름</label><input class="inp" id="charIn" maxlength="20" placeholder="캐릭터 A"></div>
             <div class="field"><label class="lbl" for="enIn">영문 표기 <span style="color:var(--faint)">· 선택</span></label><input class="inp" id="enIn" maxlength="16" placeholder="예) HARU"></div>
-            <div class="field"><label class="lbl" for="nameIn">카드 이름</label><input class="inp" id="nameIn" maxlength="24" placeholder="카드 이름"></div>
+            <div class="field"><label class="lbl" for="nameIn">카드 이름</label><input class="inp" id="nameIn" placeholder="카드 이름"></div>
           </div>
           <div class="sec">
             <div class="sec-title">등급</div>
@@ -1167,7 +1168,7 @@ function drawCard(ctx,c,im,art,sd,st){const {W,H}=SIZE[c.orient],k=col(c),land=c
   g=ctx.createLinearGradient(0,16,0,H-16);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(.7,'rgba(255,255,255,.95)');g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.fillRect(16,16,1,H-32);
   const chips=[];if(post)chips.push({t:'AWAKE',bg:'#fff',fg:k.accent});chips.push({t:RAR[c.stars]||'R',bg:k.accent,fg:'#fff'});
   chips.forEach(ch=>{ch.w=enWidth(ctx,ch.t,9.5,.19,700,F_UI)+14;});
-  const title=cardTitle(c);ctx.font=`500 10px ${F_UI}`;let tt=title;const maxT=W*.45;
+  const title=cardTitle(c);ctx.font=`500 10px ${F_UI}`;let tt=title;const maxT=Math.min(380,W-200);
   if(tt&&ctx.measureText(tt).width>maxT){while(tt.length&&ctx.measureText(tt+'…').width>maxT)tt=tt.slice(0,-1);tt+='…';}
   const tw=tt?ctx.measureText(tt).width:0,total=chips.reduce((s,ch)=>s+ch.w,0)+tw+(tt?2:0)+6*(chips.length-(tt?0:1));
   let lx=W-18-total;const dcx=lx-13;
