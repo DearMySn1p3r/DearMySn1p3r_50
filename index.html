@@ -415,6 +415,11 @@ details.more summary::-webkit-details-marker{display:none}
 .bcard{width:280px;padding:22px 24px;border-radius:14px;background:var(--surface);border:1px solid var(--line2);text-align:center;box-shadow:var(--shadow)}
 .bcard b{display:block;font-size:14px;margin-bottom:12px}
 .bcard small{display:block;margin-top:10px;color:var(--muted);font-size:12px}
+.savepanel{width:min(520px,100%);max-height:calc(100dvh - 40px);overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--line2);box-shadow:0 40px 80px -30px rgba(20,10,40,.6)}
+.savepanel img{display:block;width:100%;height:auto;border-radius:10px;background:var(--card);-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto}
+.savepanel .note b{color:var(--text)}
+.savebtns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.savebtns .btn{height:42px}
 .toast{position:fixed;left:50%;bottom:26px;z-index:200;transform:translate(-50%,16px);opacity:0;pointer-events:none;padding:10px 16px;border-radius:10px;background:var(--text);color:var(--bg);font-size:12.5px;font-weight:600;transition:opacity .2s,transform .25s;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
@@ -669,6 +674,15 @@ details.more summary::-webkit-details-marker{display:none}
 </div>
 
 <div class="busy" id="busy"><div class="bcard"><b id="bTitle">만드는 중…</b><div class="bar"><i id="bBar" style="width:0"></i></div><small id="bSub"></small></div></div>
+<div class="modal" id="saveModal" role="dialog" aria-modal="true" aria-label="저장하기">
+  <div class="savepanel">
+    <div class="row"><b style="font-size:15px">저장하기</b><button class="iconbtn" id="svClose" aria-label="닫기">✕</button></div>
+    <img id="svImg" alt="저장할 이미지">
+    <p class="note" id="svNote">이 앱 안의 브라우저에서는 바로 다운로드가 안 돼요. 위 이미지를 <b>길게 눌러 저장</b>하거나 아래 버튼을 눌러 주세요.</p>
+    <div class="savebtns"><button class="btn btn-primary" id="svShare">공유 · 저장하기</button><button class="btn" id="svExt">외부 브라우저로 열기</button></div>
+    <p class="note">외부 브라우저는 저장 공간이 따로라서, 여기서 만든 카드가 그쪽에선 안 보여요. 카드는 이 화면에서 길게 눌러 저장하는 걸 추천해요.</p>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -712,7 +726,24 @@ function setVars(el,c){const k=col(c),s=el.style,f=fontOf(c);s.setProperty('--a'
 
 /* ---------- utils ---------- */
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2300);}
-function download(href,name){const a=document.createElement('a');a.download=name;a.href=href;document.body.appendChild(a);a.click();a.remove();}
+const UA=navigator.userAgent||'',IS_KAKAO=/KAKAOTALK/i.test(UA),IN_APP=IS_KAKAO||/Instagram|FBAN|FBAV|FB_IAB|Line\/|NAVER\(inapp|DaumApps|everytimeApp|BAND\/|Twitter|; wv\)/i.test(UA);
+const blobToData=b=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.onerror=()=>r(null);f.readAsDataURL(b);});
+let svFile=null;
+async function download(href,name){
+  if(!IN_APP){const a=document.createElement('a');a.download=name;a.href=href;document.body.appendChild(a);a.click();a.remove();return;}
+  let blob=null;try{blob=await (await fetch(href)).blob();}catch(e){}
+  const src=href.startsWith('data:')?href:(blob?await blobToData(blob):href);
+  svFile=blob?new File([blob],name,{type:blob.type||'image/png'}):null;
+  $('#svImg').src=src;
+  let canShare=false;try{canShare=!!(svFile&&navigator.canShare&&navigator.canShare({files:[svFile]}));}catch(e){}
+  $('#svShare').hidden=!canShare;$('.savebtns').style.gridTemplateColumns=canShare?'1fr 1fr':'1fr';
+  $('#saveModal').classList.add('show');}
+$('#svClose').addEventListener('click',()=>$('#saveModal').classList.remove('show'));
+$('#saveModal').addEventListener('click',e=>{if(e.target.id==='saveModal')$('#saveModal').classList.remove('show');});
+$('#svShare').addEventListener('click',async()=>{if(!svFile)return;try{await navigator.share({files:[svFile]});}catch(e){if(e&&e.name!=='AbortError')toast('공유가 안 돼요 — 이미지를 길게 눌러 저장해 주세요');}});
+$('#svExt').addEventListener('click',async()=>{const u=location.href;
+  if(IS_KAKAO){location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(u);return;}
+  try{await navigator.clipboard.writeText(u);toast('주소를 복사했어요 — 크롬이나 사파리에 붙여넣어 주세요');}catch(e){toast('메뉴(⋮)에서 "다른 브라우저로 열기"를 눌러 주세요');}});
 const fname=c=>((c.char||'')+(c.name?'_'+c.name:'')||'gacha-card').replace(/[\\/:*?"<>|]+/g,'').trim()||'gacha-card';
 const artFor=(c,sd)=>c.art[sd]||c.art.pre||c.art.post||null;
 const pickLine=c=>{const l=(c.lines||[]).map(s=>s.trim()).filter(Boolean);return l.length?l[Math.floor(Math.random()*l.length)]:'';};
@@ -1085,6 +1116,7 @@ $('#pClose').addEventListener('click',()=>{if(P.preview)closePull();else finish(
 $('#pAwk').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===P.side)return;P.side=b.dataset.s;
   const el=$('.gcard',stage);if(el){updateCard(el,P.list[P.i],P.side);el.classList.remove('play','swap');void el.offsetWidth;el.classList.add('swap');}syncAwk();});
 document.addEventListener('keydown',e=>{const modal=$('#modal').classList.contains('show'),open=pull.classList.contains('show');
+  if(e.key==='Escape'&&$('#saveModal').classList.contains('show')){$('#saveModal').classList.remove('show');return;}
   if(e.key==='Escape'){if(modal)closeDetail();else if(open)closePull();return;}
   if(open&&!modal&&(e.key===' '||e.key==='Enter')&&!e.target.closest('button,input,textarea')){e.preventDefault();if(P.phase==='intro')introAdvance();else if(P.phase==='reveal')next();}});
 
@@ -1245,7 +1277,7 @@ $('#brand').addEventListener('click',e=>{e.preventDefault();setView('studio');})
 
 (async()=>{syncForm();refreshPreview();renderGems();
   try{cards=((await DB.all())||[]).map(migrate);const m=await DB.getMeta();if(m){const d=defMeta();meta=Object.assign(d,m,{banner:Object.assign(d.banner,m.banner||{})});}}catch(e){console.warn(e);}
-  if(DB.mem)toast('이 환경에선 새로고침하면 저장이 사라져요');
+  if(DB.mem)toast('이 환경에선 새로고침하면 저장이 사라져요');else if(IN_APP)setTimeout(()=>toast('앱 안 브라우저에선 길게 눌러 저장해요'),600);
   renderGems();document.fonts.ready.then(()=>{refreshPreview();if(view!=='studio')refreshViews();});})();
 })();
 </script>
