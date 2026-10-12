@@ -278,6 +278,12 @@ textarea.inp{height:auto;min-height:64px;padding:10px 11px;line-height:1.55;resi
 .onair i{width:6px;height:6px;border-radius:50%;background:var(--live);box-shadow:0 0 6px var(--live)}
 .hero h2{font-family:var(--ui);font-weight:800;letter-spacing:-.02em;font-size:clamp(24px,3.2vw,40px);line-height:1.15;text-shadow:0 2px 18px rgba(20,10,40,.4);word-break:keep-all}
 .hero p{font-size:12.5px;color:rgba(255,255,255,.75)}
+.btabs{display:flex;gap:6px;overflow-x:auto;flex-shrink:0;padding-bottom:2px;scrollbar-width:none}
+.btabs::-webkit-scrollbar{display:none}
+.btab{flex:none;height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.btab:hover{color:var(--text)}
+.btab.on{border-color:var(--accent);background:var(--accent-soft);color:var(--text)}
+.btab.add{border-style:dashed;color:var(--accent)}
 .pickups{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .pk{display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);cursor:pointer;text-align:left}
 .pk:hover{border-color:var(--line2)}
@@ -667,7 +673,7 @@ details.more summary::-webkit-details-marker{display:none}
       <div class="rv-stage fit" id="stage" data-k=".9" data-max="2"></div>
       <div class="rv-foot">
         <div class="pill" id="pAwk" role="group" aria-label="각성 상태"><button data-s="pre">각성 전</button><button data-s="post">각성 후 ✦</button></div>
-        <div class="acts"><button class="btn" id="rvLine">대사 다시</button><button class="btn btn-primary" id="rvNext">다음 카드 →</button></div>
+        <div class="acts"><button class="btn" id="rvSave">저장</button><button class="btn" id="rvLine">대사 다시</button><button class="btn btn-primary" id="rvNext">다음 카드 →</button></div>
       </div>
     </div>
     <div class="phase results" id="ph-results"><div class="res" id="res"></div></div>
@@ -782,7 +788,12 @@ const DB=(()=>{const mem={cards:new Map(),meta:null};let memMode=false,dbp=null;
     getK:k=>run('meta','readonly',s=>s.get(k),()=>mem['k_'+k]),
     setK:(k,v)=>run('meta','readwrite',s=>s.put(v,k),()=>{mem['k_'+k]=v;}),
     get mem(){return memMode;}};})();
-const defMeta=()=>({gems:30000,pity:0,owned:{},history:[],banner:{title:'픽업 가챠',sub:'픽업 카드 출현 확률이 올라가요',pickup:[],rates:{6:1,5:3,4:12,3:30,2:30,1:24},hard:80}});
+const newBanner=t=>({id:uid(),title:t||'픽업 가챠',sub:'픽업 카드 출현 확률이 올라가요',pickup:[],rates:{6:1,5:3,4:12,3:30,2:30,1:24},hard:80,pity:0});
+const defMeta=()=>{const b=newBanner();return{gems:30000,owned:{},history:[],banners:[b],cur:b.id,banner:b};};
+function fixBanners(){if(!Array.isArray(meta.banners)||!meta.banners.length){const b=Object.assign(newBanner(),meta.banner||{});if(!b.id)b.id=uid();if(b.pity==null)b.pity=meta.banner.pity||0;meta.banners=[b];meta.cur=b.id;}
+  meta.banners.forEach(b=>{const d=newBanner();for(const k in d)if(b[k]==null)b[k]=d[k];});
+  meta.banner=meta.banners.find(b=>b.id===meta.cur)||meta.banners[0];meta.cur=meta.banner.id;}
+const unpickAll=id=>meta.banners.forEach(b=>{b.pickup=b.pickup.filter(x=>x!==id);});
 let cards=[],meta=defMeta();
 const saveMeta=()=>DB.setMeta(clone(meta)).catch(e=>console.warn(e));
 function renderGems(){$('#gemVal').textContent=fmt(meta.gems);}
@@ -929,7 +940,7 @@ $$('[data-add]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.ad
 $('#newCard').addEventListener('click',()=>{loadDraft(blankCard(),'pre');toast('새 카드를 시작했어요');});
 $('#resetCard').addEventListener('click',()=>{if(!confirm('지금 카드의 이미지 · 텍스트 · 대사 · 색을 모두 비울까요?'))return;const id=draft.id,cr=draft.created;loadDraft(Object.assign(blankCard(),{id,created:cr}),'pre');toast(id?'초기화했어요 — 저장해야 반영돼요':'초기화했어요');});
 $('#delCard').addEventListener('click',async()=>{const c=cards.find(x=>x.id===draft.id);if(!c)return;if(!confirm(`'${dispName(c)}' 카드를 삭제할까요?`))return;
-  await DB.del(c.id);cards=cards.filter(x=>x.id!==c.id);meta.banner.pickup=meta.banner.pickup.filter(x=>x!==c.id);delete meta.owned[c.id];saveMeta();loadDraft(blankCard(),'pre');refreshViews();toast('삭제했어요');});
+  await DB.del(c.id);cards=cards.filter(x=>x.id!==c.id);unpickAll(c.id);delete meta.owned[c.id];saveMeta();loadDraft(blankCard(),'pre');refreshViews();toast('삭제했어요');});
 async function saveCard(asNew){
   if(!draft.art.pre&&!draft.art.post){toast('이미지를 하나 이상 올려주세요');return;}
   if(asNew){draft.id=null;draft.created=null;}
@@ -973,7 +984,7 @@ function renderCollection(){const grid=$('#colGrid');clearFits(grid);grid.innerH
 $('#colFilter').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;colFilter=+b.dataset.t;renderCollection();});
 $('#colSearch').addEventListener('input',e=>{colQuery=e.target.value;renderCollection();});
 $('#colReset').addEventListener('click',async()=>{if(!cards.length){toast('지울 카드가 없어요');return;}if(!confirm(`카드 ${cards.length}장을 모두 삭제할까요? 되돌릴 수 없어요.`))return;
-  for(const c of cards){try{await DB.del(c.id);}catch(e){}}cards=[];meta.owned={};meta.history=[];meta.pity=0;meta.banner.pickup=[];saveMeta();
+  for(const c of cards){try{await DB.del(c.id);}catch(e){}}cards=[];meta.owned={};meta.history=[];meta.banners.forEach(b=>{b.pity=0;b.pickup=[];});saveMeta();
   if(draft.id){draft.id=null;syncForm();}refreshViews();toast('컬렉션을 초기화했어요');});
 
 /* ================= DETAIL ================= */
@@ -997,7 +1008,7 @@ async function detailAct(a){const c=D.c;
   else if(a==='pu'){const p=meta.banner.pickup,i=p.indexOf(c.id);if(i>=0)p.splice(i,1);else p.push(c.id);saveMeta();renderDetail();refreshViews();}
   else if(a==='png')exportCardPNG(c,D.side);else if(a==='scene')exportScenePNG(c,D.side);
   else if(a==='del'){if(!confirm(`'${dispName(c)}' 카드를 삭제할까요?`))return;await DB.del(c.id);cards=cards.filter(x=>x.id!==c.id);
-    meta.banner.pickup=meta.banner.pickup.filter(x=>x!==c.id);delete meta.owned[c.id];saveMeta();if(draft.id===c.id){draft.id=null;syncForm();}closeDetail();refreshViews();toast('삭제했어요');}}
+    unpickAll(c.id);delete meta.owned[c.id];saveMeta();if(draft.id===c.id){draft.id=null;syncForm();}closeDetail();refreshViews();toast('삭제했어요');}}
 $('#dSide').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;D.side=b.dataset.s;renderDetail();});
 $('#dClose').addEventListener('click',closeDetail);
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeDetail();});
@@ -1013,9 +1024,9 @@ function gachaRoll(n){const {g,tiers}=groupTiers(),top=tiers[0],pu=new Set(meta.
     for(let i=0;i<ts.length;i++){if((r-=w[i])<0)return ts[i];}return ts[ts.length-1];};
   const pickCard=t=>{const pool=g[t],p=pool.filter(c=>pu.has(c.id)),np=pool.filter(c=>!pu.has(c.id));const src=p.length&&np.length?(Math.random()<.5?p:np):pool;return src[Math.floor(Math.random()*src.length)];};
   const out=[];let high=false;
-  for(let i=0;i<n;i++){meta.pity++;let min=0;
-    if(hard>0&&meta.pity>=hard)min=top;else if(n===10&&i===9&&!high&&tiers.some(t=>t>=4))min=4;
-    const c=pickCard(pickTier(min));if(c.stars>=4)high=true;if(c.stars===top)meta.pity=0;out.push(c);}
+  for(let i=0;i<n;i++){meta.banner.pity++;let min=0;
+    if(hard>0&&meta.banner.pity>=hard)min=top;else if(n===10&&i===9&&!high&&tiers.some(t=>t>=4))min=4;
+    const c=pickCard(pickTier(min));if(c.stars>=4)high=true;if(c.stars===top)meta.banner.pity=0;out.push(c);}
   return out;}
 function doPull(n){if(!cards.length){toast('먼저 카드를 만들어 저장해 주세요');return;}
   const cost=n===10?3000:300;if(meta.gems<cost){toast('💎 젬이 부족해요 — 위의 + 로 충전하세요');return;}
@@ -1029,6 +1040,7 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
   S.hidden=false;
   const pu=cards.filter(c=>B.pickup.includes(c.id)),show=(pu.length?pu:[...cards].sort((a,b)=>b.stars-a.stars)).slice(0,3),er=effRates(),hard=+B.hard||0;
   M.innerHTML=`<div class="stage-bar"><span class="stage-title"><b>✦</b>진행 중인 배너</span><span style="display:flex;align-items:center;gap:10px"><span>${pu.length?'픽업 '+pu.length+'장':'픽업 없음 · 전체 등장'}</span><button class="ibtn" id="bannerSave">배너 이미지 저장</button></span></div>
+   <div class="btabs">${meta.banners.map(b=>`<button class="btab${b===B?' on':''}" data-b="${b.id}">${esc(b.title||'이름 없는 배너')}</button>`).join('')}<button class="btab add" id="bAdd">+ 새 배너</button></div>
    <div class="hero" id="hero"><div id="slices"></div><div class="shade"></div><div class="htext"><span class="onair"><i></i>${pu.length?'PICK UP':'STANDARD'}</span><h2 id="hTitle">${esc(B.title)}</h2><p id="hSub">${esc(B.sub)}</p></div></div>
    <div class="pickups">${show.map(c=>{const r=er.cards.find(x=>x.c.id===c.id);return`<button class="pk" data-id="${c.id}"><span class="th"></span><div><span class="mst">${'★'.repeat(c.stars)}</span><b>${esc(dispName(c))}</b><small>${esc(cardTitle(c))}</small></div><em>${r?(r.r*100).toFixed(2)+'%':''}</em></button>`;}).join('')}</div>`;
   const sl=$('#slices',M),n=show.length;
@@ -1039,7 +1051,7 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
   const tiers=Object.keys(er.tier).map(Number).sort((a,b)=>b-a);
   S.innerHTML=`<div class="panel on">
    <div class="sec"><div class="sec-title">뽑기</div>
-    ${hard?`<div class="pity"><div class="row"><span>천장까지</span><b>${meta.pity} / ${hard}</b></div><div class="bar"><i style="width:${clamp(meta.pity/hard)*100}%"></i></div></div>`:'<div class="note">천장 없음</div>'}
+    ${hard?`<div class="pity"><div class="row"><span>천장까지</span><b>${meta.banner.pity} / ${hard}</b></div><div class="bar"><i style="width:${clamp(meta.banner.pity/hard)*100}%"></i></div></div>`:'<div class="note">천장 없음</div>'}
     <div class="pullbtns"><button class="pullbtn" id="pull1"><b>1회</b><small>300</small></button><button class="pullbtn ten" id="pull10"><b>10회</b><small>3,000 · ★4 1장 확정</small></button></div></div>
    <div class="sec"><div class="sec-title">확률<em>등급 합계</em></div>
     <div class="rates">${tiers.map(t=>`<div class="rate"><span>★${t}</span><div class="bar"><i style="width:${Math.max(2,er.tier[t]*100/Math.max(...Object.values(er.tier)))}%"></i></div><b style="width:46px;text-align:right;font-family:Outfit;font-weight:600">${(er.tier[t]*100).toFixed(1)}%</b></div>`).join('')}</div>
@@ -1050,12 +1062,16 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
     <div class="field"><span class="lbl">픽업 카드 · 눌러서 선택</span><div class="pchips">${cards.map(c=>`<button class="pchip${B.pickup.includes(c.id)?' on':''}" data-id="${c.id}"><i></i>${esc(dispName(c))}<span style="opacity:.6">★${c.stars}</span></button>`).join('')}</div></div>
     <div class="field"><span class="lbl">등급별 확률 (%) · 카드가 없는 등급은 자동 제외</span><div class="rates">${[6,5,4,3,2,1].map(s=>`<div class="rate"><span>★${s}</span><input type="number" min="0" step="0.1" data-s="${s}" value="${B.rates[s]??0}" aria-label="★${s} 확률"><em>%</em></div>`).join('')}</div></div>
     <div class="field"><label class="lbl" for="bHard">천장 (0이면 없음)</label><input class="inp" type="number" id="bHard" min="0" value="${hard}" style="width:100px"></div>
+    ${meta.banners.length>1?'<button class="btn btn-danger" id="bDel">이 배너 삭제</button>':''}
     </div></details></div>
    <div class="sec"><div class="sec-title">최근 기록</div><div class="hist">${meta.history.length?meta.history.slice(0,12).map(h=>`<div><span class="${h.s>=5?'hi':''}">★${h.s}</span><p>${esc(h.n)}${h.cn&&h.cn!==h.n?' · '+esc(h.cn):''}</p><time>${ago(h.t)}</time></div>`).join(''):'<div class="note">아직 뽑기 기록이 없어요.</div>'}</div></div>
    <div class="sec"><button class="btn btn-danger" id="resetData">가챠 초기화</button><div class="note">뽑기 기록 · 보유 수 · 천장 · 젬 · 배너 설정을 처음으로 되돌려요. 카드는 그대로예요.</div></div></div>`;
   $('#bannerSave').addEventListener('click',exportBannerPNG);
+  $$('.btab[data-b]',M).forEach(t=>t.addEventListener('click',()=>{meta.cur=t.dataset.b;fixBanners();saveMeta();renderGacha();}));
+  $('#bAdd').addEventListener('click',()=>{const b=newBanner('새 배너 '+(meta.banners.length+1));meta.banners.push(b);meta.cur=b.id;fixBanners();saveMeta();renderGacha();openSettings();toast('새 배너를 만들었어요 — 이름과 픽업을 정해 주세요');});
+  const bd=$('#bDel');if(bd)bd.addEventListener('click',()=>{if(!confirm(`'${B.title||'배너'}' 배너를 삭제할까요?`))return;meta.banners=meta.banners.filter(x=>x!==B);meta.cur=meta.banners[0].id;fixBanners();saveMeta();renderGacha();toast('배너를 삭제했어요');});
   $('#pull1').addEventListener('click',()=>doPull(1));$('#pull10').addEventListener('click',()=>doPull(10));
-  $('#bTitle').addEventListener('input',e=>{B.title=e.target.value;$('#hTitle').textContent=B.title;saveMeta();});
+  $('#bTitle').addEventListener('input',e=>{B.title=e.target.value;$('#hTitle').textContent=B.title;const t=$('.btab.on',M);if(t)t.textContent=B.title||'이름 없는 배너';saveMeta();});
   $('#bSub').addEventListener('input',e=>{B.sub=e.target.value;$('#hSub').textContent=B.sub;saveMeta();});
   $$('.pchip',S).forEach(b=>{const c=cards.find(x=>x.id===b.dataset.id),a=artFor(c,'pre');$('i',b).style.background=a?`url("${a.src}") center/cover`:cardBase(c);
     b.addEventListener('click',()=>{const p=B.pickup,i=p.indexOf(c.id);if(i>=0)p.splice(i,1);else p.push(c.id);saveMeta();renderGacha();$('details.more:last-of-type',S);openSettings();});});
@@ -1088,6 +1104,21 @@ async function exportBannerPNG(){const B=meta.banner,pu=cards.filter(c=>B.pickup
   tl.forEach((l,i)=>ctx.fillText(l,X,y+i*lh));ctx.restore();y+=tl.length*lh;
   if(sub){y+=22;ctx.font=`500 24px ${F_UI}`;ctx.fillStyle='rgba(255,255,255,.78)';ctx.textBaseline='top';ctx.textAlign='left';ctx.fillText(sub,X,y);}
   download(cv.toDataURL('image/png'),((B.title||'banner').replace(/[\\/:*?"<>|]+/g,'').trim()||'banner')+'_배너.png');toast('배너 이미지를 저장했어요');}
+async function exportResultsPNG(){const list=P.list;if(!list.length)return;await document.fonts.ready;
+  const n=list.length,cols=Math.min(5,n),rows=Math.ceil(n/cols),BW=n===1?600:300,BH=n===1?400:200,G=18,PAD=40,HD=64,LB=30;
+  const W=PAD*2+cols*BW+(cols-1)*G,H=PAD+HD+rows*(BH+LB)+(rows-1)*G+PAD-10,S=2,cv=document.createElement('canvas');cv.width=W*S;cv.height=H*S;
+  const ctx=cv.getContext('2d');ctx.imageSmoothingQuality='high';ctx.scale(S,S);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+  const nNew=P.news.filter(Boolean).length;ctx.textBaseline='middle';ctx.textAlign='left';ctx.fillStyle='#2b2533';ctx.font=`800 26px ${F_UI}`;ctx.fillText('뽑기 결과',PAD,PAD+16);
+  const tw=ctx.measureText('뽑기 결과').width;ctx.font=`500 15px ${F_UI}`;ctx.fillStyle='#8b8299';ctx.fillText(`${n}장${nNew?` · 새 카드 ${nNew}장`:''} · ${meta.banner.title||''}`,PAD+tw+14,PAD+18);
+  for(let i=0;i<n;i++){const c=list[i],sd=startSide(c,i),art=artFor(c,sd),im=await getImg(art),{W:cw,H:ch}=SIZE[c.orient],sc=Math.min(BW/cw,BH/ch);
+    const x=PAD+(i%cols)*(BW+G),y=PAD+HD+Math.floor(i/cols)*(BH+LB+G),ox=x+(BW-cw*sc)/2,oy=y+(BH-ch*sc)/2;
+    ctx.save();ctx.shadowColor='rgba(80,50,120,.28)';ctx.shadowBlur=16*S;ctx.shadowOffsetY=6*S;rr(ctx,ox,oy,cw*sc,ch*sc,14*sc);ctx.fillStyle='#fff';ctx.fill();ctx.restore();
+    ctx.save();ctx.translate(ox,oy);ctx.scale(sc,sc);drawCard(ctx,c,im,art,sd,null);ctx.restore();
+    const ly=y+BH+LB/2+2;ctx.textBaseline='middle';ctx.textAlign='left';let lx=x+2;
+    if(P.news[i]){ctx.font=`700 11px ${F_UI}`;const w=ctx.measureText('NEW').width+12;rr(ctx,lx,ly-8,w,16,3);ctx.fillStyle=meta.banner&&getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#ff7eb8';ctx.fill();ctx.fillStyle='#fff';ctx.fillText('NEW',lx+6,ly+.5);lx+=w+6;}
+    ctx.font=`600 13px ${F_UI}`;ctx.fillStyle='#2b2533';let nm=dispName(c);const maxW=x+BW-lx-40;while(nm.length>1&&ctx.measureText(nm).width>maxW)nm=nm.slice(0,-1);ctx.fillText(nm,lx,ly);
+    ctx.textAlign='right';ctx.font=`700 12px ${F_UI}`;ctx.fillStyle=c.stars>=5?'#ff6aa9':'#b3abbf';ctx.fillText(RAR[c.stars]||'R',x+BW-2,ly);}
+  download(cv.toDataURL('image/png'),'가챠결과_'+new Date().toISOString().slice(0,10)+'.png');}
 function openSettings(){const d=$$('#gSide details.more');if(d[1])d[1].open=true;}
 
 /* ================= PULL ================= */
@@ -1125,17 +1156,19 @@ function finish(){stopTyping();if(P.preview){closePull();return;}showResults();}
 function showResults(){setPhase('results');const R=$('#res');clearFits(R);const nNew=P.news.filter(Boolean).length;
   R.innerHTML=`<div class="res-head"><div><b>뽑기 결과</b><span>${P.list.length}장${nNew?` · 새 카드 ${nNew}장`:''}</span></div><button class="iconbtn" id="rClose" aria-label="닫기">✕</button></div>
    <div class="res-grid${P.list.length===1?' one':''}" id="resGrid"></div>
-   <div class="res-acts"><button class="btn" id="rOne">1회 더 · 300</button><button class="btn" id="rTen">10회 더 · 3,000</button><button class="btn btn-primary" id="rOk">확인</button></div>`;
+   <div class="res-acts"><button class="btn" id="rSave" style="margin-right:auto">결과 이미지 저장</button><button class="btn" id="rOne">1회 더 · 300</button><button class="btn" id="rTen">10회 더 · 3,000</button><button class="btn btn-primary" id="rOk">확인</button></div>`;
   P.list.forEach((c,i)=>{const it=document.createElement('button');it.className='res-item'+(c.stars>=5?' hi':'');it.style.animationDelay=(i*.04)+'s';
     it.innerHTML=`<div class="fit"></div><div class="res-meta"><span>${esc(dispName(c))}</span>${P.news[i]?'<em>NEW</em>':''}<b>${RAR[c.stars]||'R'}</b></div>`;
     const f=$('.fit',it);f.appendChild(makeCard(c,startSide(c,i)));$('#resGrid').appendChild(it);observeFit(f);
     it.addEventListener('click',()=>openDetail(c));});
   $('#rOne').addEventListener('click',()=>{clearFits(R);doPull(1);});$('#rTen').addEventListener('click',()=>{clearFits(R);doPull(10);});
+  $('#rSave').addEventListener('click',exportResultsPNG);
   $('#rOk').addEventListener('click',closePull);$('#rClose').addEventListener('click',closePull);}
 $('#ph-intro').addEventListener('click',e=>{if(e.target.closest('button'))return;introAdvance();});
 $('#pSkip').addEventListener('click',()=>{if(P.list.length>1)finish();else showReveal();});
 stage.addEventListener('click',()=>{const el=$('.gcard',stage);if(el&&el.classList.contains('play')&&Date.now()-P.t0<1700)el.classList.remove('play');});
 $('#rvNext').addEventListener('click',next);
+$('#rvSave').addEventListener('click',()=>exportScenePNG(P.list[P.i],P.side,!!P.news[P.i]));
 $('#rvSkip').addEventListener('click',finish);
 $('#rvSkipNew').addEventListener('click',skipToNew);
 $('#pSkipNew').addEventListener('click',skipToNew);
@@ -1230,9 +1263,9 @@ function busy(on,t,s){busyEl.classList.toggle('show',on);if(on){$('#bTitle').tex
 async function exportCardPNG(c,sd){c=migrate(c);await document.fonts.ready;const art=artFor(c,sd),im=await getImg(art),{W,H}=SIZE[c.orient],S=4;
   const cv=document.createElement('canvas');cv.width=W*S;cv.height=H*S;const ctx=cv.getContext('2d');ctx.imageSmoothingQuality='high';ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);ctx.scale(S,S);
   drawCard(ctx,c,im,art,sd,null);download(cv.toDataURL('image/png'),fname(c)+(sd==='post'&&c.art.post?'_각성':'')+'.png');}
-async function exportScenePNG(c,sd){c=migrate(c);await document.fonts.ready;const art=artFor(c,sd),im=await getImg(art),Z=sceneSize(c),S=3;
+async function exportScenePNG(c,sd,isNew){c=migrate(c);await document.fonts.ready;const art=artFor(c,sd),im=await getImg(art),Z=sceneSize(c),S=3;
   const cv=document.createElement('canvas');cv.width=Z.W*S;cv.height=Z.H*S;const ctx=cv.getContext('2d');ctx.imageSmoothingQuality='high';ctx.scale(S,S);
-  drawScene(ctx,c,im,art,{isNew:true,sd});download(cv.toDataURL('image/png'),fname(c)+'_가챠화면.png');}
+  drawScene(ctx,c,im,art,{isNew:isNew!==false,sd});download(cv.toDataURL('image/png'),fname(c)+'_가챠화면.png');}
 let workerURL=null;
 async function getWorker(){if(workerURL)return workerURL;const r=await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');workerURL=URL.createObjectURL(new Blob([await r.text()],{type:'application/javascript'}));return workerURL;}
 function wrapLines(ctx,text,maxW){const out=[];let cur='';
@@ -1306,7 +1339,7 @@ $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)s
 $('#brand').addEventListener('click',e=>{e.preventDefault();setView('studio');});
 
 (async()=>{syncForm();refreshPreview();renderGems();
-  try{cards=((await DB.all())||[]).map(migrate);const m=await DB.getMeta();if(m){const d=defMeta();meta=Object.assign(d,m,{banner:Object.assign(d.banner,m.banner||{})});}}catch(e){console.warn(e);}
+  try{cards=((await DB.all())||[]).map(migrate);const m=await DB.getMeta();if(m){const d=defMeta();meta=Object.assign(d,m);if(!Array.isArray(m.banners))meta.banners=null;fixBanners();}}catch(e){console.warn(e);}
   try{const sv=await DB.getK('draft');if(sv&&sv.d){const d=migrate(sv.d);if(d.id&&!cards.some(c=>c.id===d.id)){d.id=null;d.created=null;}draft=d;side=sv.side==='post'?'post':'pre';syncForm();refreshPreview();}}catch(e){console.warn(e);}
   draftReady=true;
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveDraftNow();});window.addEventListener('pagehide',saveDraftNow);
