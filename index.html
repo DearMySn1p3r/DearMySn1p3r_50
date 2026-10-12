@@ -581,13 +581,9 @@ details.more summary::-webkit-details-marker{display:none}
 
         <div class="panel" data-p="ooc">
           <div class="sec">
-            <div class="sec-title">이미지 프롬프트 뽑기<em>룩북 + 영문 프롬프트</em></div>
+            <div class="sec-title">카드 룩북 뽑기<em>대사 + 영문 프롬프트</em></div>
             <div class="ooc" id="oocImg"></div>
-          </div>
-          <div class="sec">
-            <div class="sec-title">카드 글 뽑기<em>레어도 · 카드명 · 대사</em></div>
-            <div class="ooc" id="oocTxt"></div>
-            <div class="note">복사해서 RP 채팅에 그대로 붙여넣으면 돼요.</div>
+            <div class="note">복사해서 RP 채팅에 그대로 붙여넣으면 돼요. 나온 대사는 대사 탭에, 그림은 이미지 칸에 넣으면 바로 카드가 돼요.</div>
           </div>
         </div>
         <div class="panel" data-p="export">
@@ -815,22 +811,14 @@ const OOC_IMG=w=>`[OOC: 이전 RP를 중지하고 새로운 상황을 전개한�
 ${w}가 가챠 게임의 캐릭터로 등장했다고 가정하고, 카드 컨셉을 룩북 형식으로 출력한다.
 
 - ${w}의 서사와 분위기에 맞춘 카드 컨셉을 최소 3가지 설정한다.
-- 컨셉마다 레어도, 카드명, 의상 · 소품 · 배경 설정을 모두 지정한다.
+- 컨셉마다 레어도(★ 개수, 최대 6개), 카드명, 의상 · 소품 · 배경 설정을 모두 지정한다.
 - 각 카드의 무드와 연출 포인트를 짧게 설명한다.
+- 각 카드마다 뽑을 때 일러스트보다 먼저 뜨는 대사를 2~3개 적는다. ${w}의 말투를 살린 한국어 한 줄 대사로, 카드 컨셉과 어울리게 쓴다.
 - 그 아래에 이미지 생성용 프롬프트를 적는다. 인물의 포즈 · 표정, 의상, 배경, 조명을 모두 포함한다.
 - 프롬프트에는 ${w} 한 명만 등장한다.
 - 프롬프트는 영문으로 작성하고, 외형 태그와 퀄리티 태그는 넣지 않는다.]`;
-const OOC_TXT=(w,o)=>`[OOC: 이전 RP를 중지하고 새로운 상황을 전개한다.
-${w}가 가챠 게임의 캐릭터로 등장했다고 가정한다. ${w}의 페르소나, 외형, 성격, 서사, ${o}와의 관계를 캐릭터 해석하여 여러 장의 카드를 만들어 출력한다.
-각 카드는 아래 항목으로 구성하고, 문서 형식으로 깔끔하게 정리한다.
-
-· 레어도: ★ 개수로 표기 (최대 6개)
-· 카드명: 카드 컨셉을 함축한 이름. 한글 또는 영문, 수식어가 붙은 형태
-· 일러스트 컨셉: ${w}가 어떤 모습 · 의상 · 표정 · 배경으로 그려지는지 짧게 묘사
-· 플레이버 텍스트: 카드 하단에 들어갈 한두 줄의 짧은 대사나 독백]`;
 async function copyText(t){try{await navigator.clipboard.writeText(t);return true;}catch(e){const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.appendChild(a);a.select();let ok=false;try{ok=document.execCommand('copy');}catch(_){}a.remove();return ok;}}
-[['#oocImg',[['PC','PC 룩북 · 이미지 프롬프트',OOC_IMG('PC')],['NPC','NPC 룩북 · 이미지 프롬프트',OOC_IMG('NPC')]]],
- ['#oocTxt',[['PC','PC 카드 목록 · 글',OOC_TXT('PC','NPC')],['NPC','NPC 카드 목록 · 글',OOC_TXT('NPC','PC')]]]].forEach(([sel,items])=>items.forEach(([tag,title,text])=>{
+[['#oocImg',[['PC','PC 카드 룩북',OOC_IMG('PC')],['NPC','NPC 카드 룩북',OOC_IMG('NPC')]]]].forEach(([sel,items])=>items.forEach(([tag,title,text])=>{
   const d=document.createElement('div');d.className='ooc-item';
   d.innerHTML=`<div class="ooc-head"><span class="ooc-tag">${tag}</span><b>${title}</b><button class="ibtn">복사</button></div><pre class="ooc-body"></pre>`;
   $('pre',d).textContent=text;const b=$('button',d);
@@ -987,7 +975,7 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
   if(!cards.length){M.innerHTML=emptyHTML('가챠에 넣을 카드가 없어요','카드를 만들어 저장하면 바로 뽑기를 해볼 수 있어요.<br>먼저 체험해 보고 싶다면 샘플 카드를 넣어보세요.');bindEmpty(M);S.hidden=true;return;}
   S.hidden=false;
   const pu=cards.filter(c=>B.pickup.includes(c.id)),show=(pu.length?pu:[...cards].sort((a,b)=>b.stars-a.stars)).slice(0,3),er=effRates(),hard=+B.hard||0;
-  M.innerHTML=`<div class="stage-bar"><span class="stage-title"><b>✦</b>진행 중인 배너</span><span>${pu.length?'픽업 '+pu.length+'장':'픽업 없음 · 전체 등장'}</span></div>
+  M.innerHTML=`<div class="stage-bar"><span class="stage-title"><b>✦</b>진행 중인 배너</span><span style="display:flex;align-items:center;gap:10px"><span>${pu.length?'픽업 '+pu.length+'장':'픽업 없음 · 전체 등장'}</span><button class="ibtn" id="bannerSave">배너 이미지 저장</button></span></div>
    <div class="hero" id="hero"><div id="slices"></div><div class="shade"></div><div class="htext"><span class="onair"><i></i>${pu.length?'PICK UP':'STANDARD'}</span><h2 id="hTitle">${esc(B.title)}</h2><p id="hSub">${esc(B.sub)}</p></div></div>
    <div class="pickups">${show.map(c=>{const r=er.cards.find(x=>x.c.id===c.id);return`<button class="pk" data-id="${c.id}"><span class="th"></span><div><span class="mst">${'★'.repeat(c.stars)}</span><b>${esc(dispName(c))}</b><small>${esc(cardTitle(c))}</small></div><em>${r?(r.r*100).toFixed(2)+'%':''}</em></button>`;}).join('')}</div>`;
   const sl=$('#slices',M),n=show.length;
@@ -1012,6 +1000,7 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
     </div></details></div>
    <div class="sec"><div class="sec-title">최근 기록</div><div class="hist">${meta.history.length?meta.history.slice(0,12).map(h=>`<div><span class="${h.s>=5?'hi':''}">★${h.s}</span><p>${esc(h.n)}${h.cn&&h.cn!==h.n?' · '+esc(h.cn):''}</p><time>${ago(h.t)}</time></div>`).join(''):'<div class="note">아직 뽑기 기록이 없어요.</div>'}</div></div>
    <div class="sec"><button class="btn btn-danger" id="resetData">가챠 초기화</button><div class="note">뽑기 기록 · 보유 수 · 천장 · 젬 · 배너 설정을 처음으로 되돌려요. 카드는 그대로예요.</div></div></div>`;
+  $('#bannerSave').addEventListener('click',exportBannerPNG);
   $('#pull1').addEventListener('click',()=>doPull(1));$('#pull10').addEventListener('click',()=>doPull(10));
   $('#bTitle').addEventListener('input',e=>{B.title=e.target.value;$('#hTitle').textContent=B.title;saveMeta();});
   $('#bSub').addEventListener('input',e=>{B.sub=e.target.value;$('#hSub').textContent=B.sub;saveMeta();});
@@ -1020,6 +1009,32 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
   $$('.rate input',S).forEach(i=>i.addEventListener('change',()=>{B.rates[i.dataset.s]=Math.max(0,parseFloat(i.value)||0);saveMeta();renderGacha();openSettings();}));
   $('#bHard').addEventListener('change',e=>{B.hard=Math.max(0,parseInt(e.target.value)||0);saveMeta();renderGacha();openSettings();});
   $('#resetData').addEventListener('click',()=>{if(!confirm('가챠를 초기화할까요? 뽑기 기록, 보유 수, 천장, 젬이 처음으로 돌아가고, 배너 이름 · 픽업 · 확률 설정도 기본값으로 돌아가요. (카드는 그대로예요)'))return;meta=defMeta();saveMeta();renderGems();renderGacha();toast('초기화했어요');});}
+async function exportBannerPNG(){const B=meta.banner,pu=cards.filter(c=>B.pickup.includes(c.id)),show=(pu.length?pu:[...cards].sort((a,b)=>b.stars-a.stars)).slice(0,3);
+  if(!show.length){toast('배너에 넣을 카드가 없어요');return;}
+  await document.fonts.ready;const W=1600,H=700,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');ctx.imageSmoothingQuality='high';
+  ctx.fillStyle='#241a36';ctx.fillRect(0,0,W,H);const n=show.length,o=.07*W;
+  for(let i=0;i<n;i++){const c=show[i],a=artFor(c,'post'),im=await getImg(a);
+    const L=n>1?i*W/n-(i?o/2:0):0,Wd=n>1?W/n+(i?o/2:0)+(i<n-1?o/2:0):W;
+    ctx.save();ctx.beginPath();
+    if(n>1){const l=i===0?0:Wd*.09,r=i===n-1?Wd:Wd*.91;ctx.moveTo(L+l,0);ctx.lineTo(L+Wd,0);ctx.lineTo(L+r,H);ctx.lineTo(L,H);}else ctx.rect(0,0,W,H);
+    ctx.closePath();ctx.clip();
+    if(im){const sc=Math.max(Wd/im.naturalWidth,H/im.naturalHeight),dw=im.naturalWidth*sc,dh=im.naturalHeight*sc;ctx.drawImage(im,L+(Wd-dw)/2,(H-dh)*.22,dw,dh);}
+    else{ctx.translate(L,0);paintBase(ctx,c,Wd,H);}
+    ctx.restore();}
+  let g=ctx.createLinearGradient(0,0,W,0);g.addColorStop(0,'rgba(22,15,34,.9)');g.addColorStop(.36,'rgba(22,15,34,.6)');g.addColorStop(.64,'rgba(22,15,34,0)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const acc=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#ff7eb8',X=72,maxW=W*.52-X;
+  ctx.font=`800 76px ${F_UI}`;const tl=wrapLines(ctx,B.title||'픽업 가챠',maxW).slice(0,3),lh=76*1.15;
+  ctx.font=`500 24px ${F_UI}`;const sub=B.sub||'';
+  const blockH=34+22+tl.length*lh+(sub?22+30:0);let y=H/2-blockH/2;
+  // chip
+  ctx.font=`700 17px ${F_EN}`;const lab=pu.length?'PICK UP':'STANDARD',cw=enWidth(ctx,lab,17,2.4,700)+56;
+  rr(ctx,X,y,cw,34,17);ctx.strokeStyle='rgba(255,77,125,.55)';ctx.lineWidth=2;ctx.stroke();
+  ctx.save();ctx.fillStyle='#ff4d7d';ctx.shadowColor='#ff4d7d';ctx.shadowBlur=10;ctx.beginPath();ctx.arc(X+20,y+17,5,0,7);ctx.fill();ctx.restore();
+  ctx.fillStyle='#ffc2d4';ctx.font=`700 17px ${F_EN}`;ctx.textBaseline='middle';spaced(ctx,lab,X+36,y+17.5,2.4,'left');
+  y+=34+22;ctx.save();ctx.font=`800 76px ${F_UI}`;ctx.fillStyle='#ffffff';ctx.textBaseline='top';ctx.textAlign='left';ctx.shadowColor='rgba(20,10,40,.45)';ctx.shadowBlur=24;
+  tl.forEach((l,i)=>ctx.fillText(l,X,y+i*lh));ctx.restore();y+=tl.length*lh;
+  if(sub){y+=22;ctx.font=`500 24px ${F_UI}`;ctx.fillStyle='rgba(255,255,255,.78)';ctx.textBaseline='top';ctx.textAlign='left';ctx.fillText(sub,X,y);}
+  download(cv.toDataURL('image/png'),((B.title||'banner').replace(/[\\/:*?"<>|]+/g,'').trim()||'banner')+'_배너.png');toast('배너 이미지를 저장했어요');}
 function openSettings(){const d=$$('#gSide details.more');if(d[1])d[1].open=true;}
 
 /* ================= PULL ================= */
