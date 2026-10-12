@@ -341,7 +341,10 @@ details.more summary::-webkit-details-marker{display:none}
 .dlg-c.a{left:12px;top:12px;border-left:1.5px solid var(--ia);border-top:1.5px solid var(--ia)}
 .dlg-c.b{right:12px;bottom:12px;border-right:1.5px solid var(--ia);border-bottom:1.5px solid var(--ia)}
 .dlg-tw svg{position:absolute;animation:tw 3s ease-in-out infinite;pointer-events:none}
-.dlg-skip{position:absolute;right:30px;top:24px;z-index:2;border:0;background:none;color:rgba(255,255,255,.5);font-size:12px;padding:4px 0}
+.dlg-skips{position:absolute;right:30px;top:24px;z-index:2;display:flex;gap:16px}
+.dlg-skip{border:0;background:none;color:rgba(255,255,255,.5);font-size:12px;padding:4px 0}
+.dlg-skip.new{color:var(--ia)}
+.rv-skip.new{color:var(--accent);font-weight:600}
 .dlg-skip:hover{color:#fff}
 .dlg-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:0 56px;text-align:center}
 .dlg-mid>svg{width:22px;height:22px;color:var(--ia);filter:drop-shadow(0 0 6px var(--ia))}
@@ -649,7 +652,7 @@ details.more summary::-webkit-details-marker{display:none}
   <div class="pbox" id="pbox">
     <div class="phase intro" id="ph-intro">
       <div class="dlg-frame"></div><i class="dlg-c a"></i><i class="dlg-c b"></i><div class="dlg-tw" id="dTw"></div>
-      <button class="dlg-skip" id="pSkip">건너뛰기 »</button>
+      <div class="dlg-skips"><button class="dlg-skip new" id="pSkipNew">NEW까지 »</button><button class="dlg-skip" id="pSkip">건너뛰기 »</button></div>
       <div class="dlg-mid">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0C12.6 8 16 11.4 24 12 16 12.6 12.6 16 12 24 11.4 16 8 12.6 0 12 8 11.4 11.4 8 12 0z" fill="currentColor"/></svg>
         <p class="itext" id="iText"><span class="typed"></span><span class="rest"></span></p>
@@ -659,7 +662,7 @@ details.more summary::-webkit-details-marker{display:none}
     <div class="phase reveal" id="ph-reveal">
       <div class="rv-top">
         <div><span class="rv-count" id="rvCount"></span><span class="rv-new" id="rvNew">NEW</span></div>
-        <div><button class="rv-skip" id="rvSkip">모두 건너뛰기 »</button><button class="iconbtn" id="pClose" aria-label="닫기">✕</button></div>
+        <div><button class="rv-skip new" id="rvSkipNew">NEW까지 »</button><button class="rv-skip" id="rvSkip">모두 건너뛰기 »</button><button class="iconbtn" id="pClose" aria-label="닫기">✕</button></div>
       </div>
       <div class="rv-stage fit" id="stage" data-k=".9" data-max="2"></div>
       <div class="rv-foot">
@@ -964,8 +967,8 @@ function renderCollection(){const grid=$('#colGrid');clearFits(grid);grid.innerH
   if(!list.length){em.innerHTML='<div class="empty"><p>조건에 맞는 카드가 없어요.</p></div>';}
   list.forEach((c,i)=>{const it=document.createElement('button');it.className='citem';it.style.animationDelay=Math.min(i*.035,.5)+'s';
     it.innerHTML=`<div class="fit"></div><div class="cmeta"><div><b>${esc(c.name||dispName(c))}</b><small>${esc(c.char||'—')} · ★${c.stars}</small></div><span style="display:flex;gap:4px">${meta.banner.pickup.includes(c.id)?'<span class="chip pu">PICK</span>':''}${ownChip(c)}</span></div>`;
-    const f=$('.fit',it),card=makeCard(c,'pre');f.appendChild(card);grid.appendChild(it);observeFit(f);
-    if(c.art.pre&&c.art.post){it.addEventListener('mouseenter',()=>updateCard(card,c,'post'));it.addEventListener('mouseleave',()=>updateCard(card,c,'pre'));}
+    const base=ownSide(c),f=$('.fit',it),card=makeCard(c,base);f.appendChild(card);grid.appendChild(it);observeFit(f);
+    if(c.art.pre&&c.art.post){it.addEventListener('mouseenter',()=>updateCard(card,c,base==='post'?'pre':'post'));it.addEventListener('mouseleave',()=>updateCard(card,c,base));}
     it.addEventListener('click',()=>openDetail(c));});}
 $('#colFilter').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;colFilter=+b.dataset.t;renderCollection();});
 $('#colSearch').addEventListener('input',e=>{colQuery=e.target.value;renderCollection();});
@@ -975,7 +978,8 @@ $('#colReset').addEventListener('click',async()=>{if(!cards.length){toast('지�
 
 /* ================= DETAIL ================= */
 const D={c:null,side:'pre',li:0};
-function openDetail(c){D.c=c;D.side=c.art.pre?'pre':'post';D.li=0;$('#modal').classList.add('show');renderDetail();}
+const ownSide=c=>(meta.owned[c.id]||0)>=2&&c.art.post?'post':(c.art.pre?'pre':'post');
+function openDetail(c){D.c=c;D.side=ownSide(c);D.li=0;$('#modal').classList.add('show');renderDetail();}
 function closeDetail(){$('#modal').classList.remove('show');clearFits($('#modal'));}
 function renderDetail(){const c=D.c,f=$('#dFit');clearFits(f.parentNode);f.innerHTML='';f.appendChild(makeCard(c,D.side));observeFit(f);
   $$('#dSide button').forEach(b=>{b.classList.toggle('on',b.dataset.s===D.side);b.disabled=!c.art[b.dataset.s];});
@@ -1016,9 +1020,9 @@ function gachaRoll(n){const {g,tiers}=groupTiers(),top=tiers[0],pu=new Set(meta.
 function doPull(n){if(!cards.length){toast('먼저 카드를 만들어 저장해 주세요');return;}
   const cost=n===10?3000:300;if(meta.gems<cost){toast('💎 젬이 부족해요 — 위의 + 로 충전하세요');return;}
   meta.gems-=cost;const res=gachaRoll(n),own={...meta.owned};
-  const news=res.map(c=>{const nw=!(own[c.id]>0);own[c.id]=(own[c.id]||0)+1;return nw;});meta.owned=own;
+  const awk=[];const news=res.map(c=>{const nw=!(own[c.id]>0);own[c.id]=(own[c.id]||0)+1;awk.push(own[c.id]>=2&&!!c.art.post);return nw;});meta.owned=own;
   const now=Date.now();res.forEach(c=>meta.history.unshift({id:c.id,s:c.stars,n:dispName(c),cn:c.name,t:now}));meta.history=meta.history.slice(0,60);
-  saveMeta();renderGems();runPull(res,news,{n});}
+  saveMeta();renderGems();runPull(res,news,{n,awk});}
 const ago=t=>{const s=(Date.now()-t)/1000;if(s<60)return'방금';if(s<3600)return Math.floor(s/60)+'분 전';if(s<86400)return Math.floor(s/3600)+'시간 전';return Math.floor(s/86400)+'일 전';};
 function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits(M);
   if(!cards.length){M.innerHTML=emptyHTML('가챠에 넣을 카드가 없어요','카드를 만들어 저장하면 바로 뽑기를 해볼 수 있어요.<br>먼저 체험해 보고 싶다면 샘플 카드를 넣어보세요.');bindEmpty(M);S.hidden=true;return;}
@@ -1092,15 +1096,16 @@ const P={list:[],news:[],i:0,phase:'',preview:false,n:1,side:'pre',line:'',t0:0}
 let typer=null;
 [[12,18,9,2.6],[83,14,7,3.1],[88,26,11,2.2],[9,72,7,3.4],[78,80,8,2.8],[22,34,6,3.8]].forEach(([x,y,s,d])=>$('#dTw').insertAdjacentHTML('beforeend',`<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="left:${x}%;top:${y}%;animation-duration:${d}s" aria-hidden="true"><path d="${SPARK}" fill="#fff"/></svg>`));
 function setPhase(ph){P.phase=ph;$$('.phase',pull).forEach(e=>e.classList.toggle('on',e.id==='ph-'+ph));$('#pbox').dataset.ph=ph;}
-function runPull(list,news,o={}){P.list=list.map(migrate);P.news=news;P.i=0;P.preview=!!o.preview;P.n=o.n||list.length;
+function runPull(list,news,o={}){P.list=list.map(migrate);P.news=news;P.awk=o.awk||[];P.i=0;P.preview=!!o.preview;P.n=o.n||list.length;
   const b=$('#pbox');b.style.animation='none';void b.offsetWidth;b.style.animation='';pull.classList.add('show');showCard(0);}
 function closePull(){stopTyping();pull.classList.remove('show');clearFits($('#res'));$('#res').innerHTML='';stage.innerHTML='';refreshViews();}
-function showCard(i){P.i=i;const c=P.list[i];P.side=c.art.pre?'pre':'post';P.line=pickLine(c,P.side);if(P.line)showIntro();else showReveal();}
+const startSide=(c,i)=>P.awk[i]&&c.art.post?'post':(c.art.pre?'pre':'post');
+function showCard(i){P.i=i;const c=P.list[i];P.side=startSide(c,i);P.line=pickLine(c,P.side);if(P.line)showIntro();else showReveal();}
 function showIntro(){const c=P.list[P.i],k=col(c),ph=$('#ph-intro');ph.classList.remove('done');
   ph.style.setProperty('--ia',k.accent);ph.style.setProperty('--iag',rgba(k.accent,.24));setPhase('intro');
   $('#iDots').innerHTML=P.list.length>1?P.list.map((_,j)=>`<i class="${j<P.i?'done':j===P.i?'cur':''}"></i>`).join(''):'';
   const t=$('#iText');t.classList.remove('in');void t.offsetWidth;t.classList.add('in');
-  startTyping(P.line,()=>ph.classList.add('done'));P.t0=Date.now();}
+  startTyping(P.line,()=>ph.classList.add('done'));syncSkipNew();P.t0=Date.now();}
 function startTyping(line,done){const ty=$('#iText .typed'),rs=$('#iText .rest'),arr=[...line];let i=0;stopTyping();ty.textContent='';rs.textContent=line;
   typer={done:false,finish(){clearInterval(this.t);ty.textContent=line;rs.textContent='';this.done=true;done&&done();}};
   typer.t=setInterval(()=>{i++;ty.textContent=arr.slice(0,i).join('');rs.textContent=arr.slice(i).join('');if(i>=arr.length)typer.finish();},42);}
@@ -1108,10 +1113,13 @@ function stopTyping(){if(typer){clearInterval(typer.t);typer=null;}}
 function introAdvance(){if(Date.now()-P.t0<250)return;if(typer&&!typer.done){typer.finish();return;}showReveal();}
 function showReveal(){const c=P.list[P.i],multi=P.list.length>1,last=P.i+1>=P.list.length;stopTyping();setPhase('reveal');
   $('#rvCount').innerHTML=multi?`${String(P.i+1).padStart(2,'0')} <span>/ ${String(P.list.length).padStart(2,'0')}</span>`:(P.preview?'PREVIEW':'SCOUT');
-  $('#rvNew').hidden=!P.news[P.i];$('#rvSkip').hidden=!multi||last;$('#rvLine').hidden=!pickLine(c,P.side);
+  $('#rvNew').hidden=!P.news[P.i];syncSkipNew();$('#rvSkip').hidden=!multi||last;$('#rvLine').hidden=!pickLine(c,P.side);
   $('#rvNext').textContent=last?(P.preview?'닫기':'결과 보기'):'다음 카드 →';
   stage.innerHTML='';const el=makeCard(c,P.side);el.classList.add('play');stage.appendChild(el);fit(stage);syncAwk();P.t0=Date.now();}
 function syncAwk(){const c=P.list[P.i],g=$('#pAwk');g.hidden=!(c.art.pre&&c.art.post);$$('button',g).forEach(b=>b.classList.toggle('on',b.dataset.s===P.side));}
+function nextNewIdx(){for(let j=P.i+1;j<P.list.length;j++)if(P.news[j])return j;return -1;}
+function skipToNew(){const j=nextNewIdx();if(j<0){finish();return;}showCard(j);}
+const syncSkipNew=()=>{const h=P.list.length<2||nextNewIdx()<0;$('#pSkipNew').hidden=h;$('#rvSkipNew').hidden=h;};
 function next(){if(P.i+1<P.list.length)showCard(P.i+1);else finish();}
 function finish(){stopTyping();if(P.preview){closePull();return;}showResults();}
 function showResults(){setPhase('results');const R=$('#res');clearFits(R);const nNew=P.news.filter(Boolean).length;
@@ -1120,7 +1128,7 @@ function showResults(){setPhase('results');const R=$('#res');clearFits(R);const 
    <div class="res-acts"><button class="btn" id="rOne">1회 더 · 300</button><button class="btn" id="rTen">10회 더 · 3,000</button><button class="btn btn-primary" id="rOk">확인</button></div>`;
   P.list.forEach((c,i)=>{const it=document.createElement('button');it.className='res-item'+(c.stars>=5?' hi':'');it.style.animationDelay=(i*.04)+'s';
     it.innerHTML=`<div class="fit"></div><div class="res-meta"><span>${esc(dispName(c))}</span>${P.news[i]?'<em>NEW</em>':''}<b>${RAR[c.stars]||'R'}</b></div>`;
-    const f=$('.fit',it);f.appendChild(makeCard(c,c.stars>=5&&c.art.post?'post':'pre'));$('#resGrid').appendChild(it);observeFit(f);
+    const f=$('.fit',it);f.appendChild(makeCard(c,startSide(c,i)));$('#resGrid').appendChild(it);observeFit(f);
     it.addEventListener('click',()=>openDetail(c));});
   $('#rOne').addEventListener('click',()=>{clearFits(R);doPull(1);});$('#rTen').addEventListener('click',()=>{clearFits(R);doPull(10);});
   $('#rOk').addEventListener('click',closePull);$('#rClose').addEventListener('click',closePull);}
@@ -1129,6 +1137,8 @@ $('#pSkip').addEventListener('click',()=>{if(P.list.length>1)finish();else showR
 stage.addEventListener('click',()=>{const el=$('.gcard',stage);if(el&&el.classList.contains('play')&&Date.now()-P.t0<1700)el.classList.remove('play');});
 $('#rvNext').addEventListener('click',next);
 $('#rvSkip').addEventListener('click',finish);
+$('#rvSkipNew').addEventListener('click',skipToNew);
+$('#pSkipNew').addEventListener('click',skipToNew);
 $('#rvLine').addEventListener('click',()=>{const l=pickLine(P.list[P.i],P.side);if(l){P.line=l;showIntro();}});
 $('#pClose').addEventListener('click',()=>{if(P.preview)closePull();else finish();});
 $('#pAwk').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===P.side)return;P.side=b.dataset.s;
