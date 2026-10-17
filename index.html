@@ -347,6 +347,13 @@ details.more summary::-webkit-details-marker{display:none}
 .rlist div:nth-child(odd){background:var(--card)}
 .rlist b{font-family:'Outfit',sans-serif;font-weight:600}
 .pchips{display:flex;flex-wrap:wrap;gap:6px}
+.hord{display:flex;flex-direction:column;gap:6px}
+.ho{display:flex;align-items:center;gap:8px;padding:5px 6px 5px 5px;border-radius:9px;border:1px solid var(--line2)}
+.ho.off{opacity:.5}
+.ho i{width:44px;height:30px;border-radius:6px;flex:none;background:var(--card)}
+.ho b{flex:1;min-width:0;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ho .ibtn{height:26px;padding:0 8px;font-size:11px}
+.ho .ibtn:disabled{opacity:.35;cursor:default}
 .pchip{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px 0 4px;border-radius:999px;border:1px solid var(--line2);background:transparent;font-size:12px;color:var(--muted)}
 .pchip i{width:22px;height:22px;border-radius:50%;background:var(--card) center/cover}
 .pchip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--text);font-weight:600}
@@ -844,6 +851,10 @@ function fixBanners(){if(!Array.isArray(meta.banners)||!meta.banners.length){con
 const unpickAll=id=>meta.banners.forEach(b=>{b.pickup=b.pickup.filter(x=>x!==id);b.excl=b.excl.filter(x=>x!==id);b.incl=(b.incl||[]).filter(x=>x!==id);if(b.only)b.only=b.only.filter(x=>x!==id);});
 const inPool=(B,c)=>B.only?B.only.includes(c.id)&&!(B.excl||[]).includes(c.id):c.shared?(B.incl||[]).includes(c.id):!(B.excl||[]).includes(c.id);
 const poolOf=B=>cards.filter(c=>inPool(B,c));
+const puList=B=>{const m=new Map(poolOf(B).map(c=>[c.id,c]));return B.pickup.map(id=>m.get(id)).filter(Boolean);};
+const heroCards=B=>{const pu=puList(B);return(pu.length?pu:[...poolOf(B)].sort((a,b)=>b.stars-a.stars)).slice(0,3);};
+const heroSide=(B,c)=>{const s=(B.hside||{})[c.id];return s&&c.art[s]?s:(c.art.post?'post':'pre');};
+const heroArt=(B,c)=>artFor(c,heroSide(B,c));
 const guarTier=tiers=>tiers.some(t=>t>=5)?5:tiers.some(t=>t>=4)?4:0;
 let cards=[],meta=defMeta();
 const saveMeta=()=>DB.setMeta(clone(meta)).catch(e=>console.warn(e));
@@ -1128,16 +1139,16 @@ const ago=t=>{const s=(Date.now()-t)/1000;if(s<60)return'방금';if(s<3600)retur
 function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits(M);
   if(!cards.length){M.innerHTML=emptyHTML('가챠에 넣을 카드가 없어요','카드를 만들어 저장하면 바로 뽑기를 해볼 수 있어요.<br>먼저 체험해 보고 싶다면 샘플 카드를 넣어보세요.');bindEmpty(M);S.hidden=true;return;}
   S.hidden=false;
-  const pool=poolOf(B),pu=pool.filter(c=>B.pickup.includes(c.id)),show=(pu.length?pu:[...pool].sort((a,b)=>b.stars-a.stars)).slice(0,3),er=effRates(),hard=+B.hard||0,gt=guarTier(Object.keys(er.tier).map(Number));
+  const pool=poolOf(B),pu=puList(B),show=heroCards(B),er=effRates(),hard=+B.hard||0,gt=guarTier(Object.keys(er.tier).map(Number));
   M.innerHTML=`<div class="stage-bar"><span class="stage-title"><b>✦</b>진행 중인 배너</span><span style="display:flex;align-items:center;gap:10px"><span>${pu.length?'픽업 '+pu.length+'장':'픽업 없음 · 전체 등장'}</span>${B.only?'':'<button class="ibtn" id="bShare">배너 공유</button>'}<button class="ibtn" id="bDelTop">배너 삭제</button><button class="ibtn" id="bannerSave">배너 이미지 저장</button></span></div>
    <div class="btabs">${meta.banners.map(b=>`<button class="btab${b===B?' on':''}${b.only?' shared':''}" data-b="${b.id}"><span class="bt">${esc(b.title||'이름 없는 배너')}</span><span class="bx" data-del="${b.id}" role="button" aria-label="배너 삭제" title="이 배너 삭제">✕</span></button>`).join('')}<button class="btab add" id="bAdd">+ 새 배너</button><button class="btab add" data-import>공유 배너 가져오기</button></div>
    <div class="hero" id="hero"><div id="slices"></div><div class="shade"></div><div class="htext"><span class="onair"><i></i>${pu.length?'PICK UP':'STANDARD'}</span><h2 id="hTitle">${esc(B.title)}</h2><p id="hSub">${esc(B.sub)}</p></div></div>
    <div class="pickups">${show.map(c=>{const r=er.cards.find(x=>x.c.id===c.id);return`<button class="pk" data-id="${c.id}"><span class="th"></span><div><span class="mst">${'★'.repeat(c.stars)}</span><b>${esc(dispName(c))}</b><small>${esc(cardTitle(c))}</small></div><em>${r?(r.r*100).toFixed(2)+'%':''}</em></button>`;}).join('')}</div>`;
   const sl=$('#slices',M),n=show.length;
-  show.forEach((c,i)=>{const d=document.createElement('div');d.className='slice';const a=artFor(c,'post');d.style.background=a?`url("${a.src}") center 22%/cover`:cardBase(c);
+  show.forEach((c,i)=>{const d=document.createElement('div');d.className='slice';const a=heroArt(B,c);d.style.background=a?`url("${a.src}") center 22%/cover`:cardBase(c);
     if(n>1){const o=7;d.style.left=(i*100/n-(i?o/2:0))+'%';d.style.width=(100/n+(i?o/2:0)+(i<n-1?o/2:0))+'%';d.style.clipPath=i===0?'polygon(0 0,100% 0,91% 100%,0 100%)':i===n-1?'polygon(9% 0,100% 0,100% 100%,0 100%)':'polygon(9% 0,100% 0,91% 100%,0 100%)';}
     else{d.style.left='0';d.style.right='0';}sl.appendChild(d);});
-  $$('.pk',M).forEach(el=>{const c=cards.find(x=>x.id===el.dataset.id),a=artFor(c,'post');const th=$('.th',el);th.style.background=a?`url("${a.src}") center 20%/cover`:cardBase(c);el.addEventListener('click',()=>openDetail(c));});
+  $$('.pk',M).forEach(el=>{const c=cards.find(x=>x.id===el.dataset.id),a=heroArt(B,c);const th=$('.th',el);th.style.background=a?`url("${a.src}") center 20%/cover`:cardBase(c);el.addEventListener('click',()=>openDetail(c));});
   const tiers=Object.keys(er.tier).map(Number).sort((a,b)=>b-a);
   S.innerHTML=`<div class="panel on">
    <div class="sec"><div class="sec-title">뽑기</div>
@@ -1150,6 +1161,7 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
     <div class="field"><label class="lbl" for="bTitle">배너 이름</label><input class="inp" id="bTitle" maxlength="26" value="${esc(B.title)}"></div>
     <div class="field"><label class="lbl" for="bSub">부제</label><input class="inp" id="bSub" maxlength="40" value="${esc(B.sub)}"></div>
     <div class="field"><span class="lbl">픽업 카드 · 눌러서 선택</span><div class="pchips">${pool.map(c=>`<button class="pchip${B.pickup.includes(c.id)?' on':''}" data-id="${c.id}"><i></i>${esc(dispName(c))}<span style="opacity:.6">★${c.stars}</span></button>`).join('')}</div></div>
+    ${pu.length?`<div class="field"><span class="lbl">메인 이미지 순서 · 앞에서 3장이 배너에 나와요</span><div class="hord">${pu.map((c,i)=>`<div class="ho${i<3?'':' off'}"><i data-th="${c.id}"></i><b>${i+1}. ${esc(dispName(c))}</b><button class="ibtn" data-hs="${c.id}" ${c.art.pre&&c.art.post?'':'disabled'}>${heroSide(B,c)==='post'?'각성 후':'각성 전'}</button><button class="ibtn" data-mv="${i}" data-d="-1" ${i?'':'disabled'} aria-label="앞으로">↑</button><button class="ibtn" data-mv="${i}" data-d="1" ${i<pu.length-1?'':'disabled'} aria-label="뒤로">↓</button></div>`).join('')}</div></div>`:''}
     <div class="field"><label class="lbl" for="bPu">픽업 비중 (%) · 같은 등급 안에서 픽업 카드가 나올 확률</label><input class="inp" type="number" id="bPu" min="0" max="100" step="5" value="${B.pu}" style="width:100px"></div>
     <div class="field"><span class="lbl row">등장 카드 · 눌러서 빼거나 넣기 <span style="display:flex;gap:10px"><button class="link" id="bPoolAll">${B.only?'전체 넣기':'내 카드 전체'}</button><button class="link" id="bPoolNone" style="color:var(--muted)">전체 빼기</button></span></span><div class="pchips">${(B.only?cards.filter(c=>B.only.includes(c.id)):cards).map(c=>`<button class="pchip pool${inPool(B,c)?' on':''}" data-pid="${c.id}"><i></i>${esc(dispName(c))}<span style="opacity:.6">★${c.stars}${c.shared&&!B.only?' · 받음':''}</span></button>`).join('')}</div><div class="note">지금 이 배너에 ${pool.length}장이 떠요.${B.only?' 공유받은 배너라 받은 카드 안에서만 고를 수 있어요.':' 공유로 받은 카드는 기본으로 빠져 있어요. 넣고 싶으면 눌러서 켜 주세요.'}</div></div>
     <div class="field"><span class="lbl">등급별 확률 (%) · 카드가 없는 등급은 자동 제외</span><div class="rates">${[6,5,4,3,2,1].map(s=>`<div class="rate"><span>★${s}</span><input type="number" min="0" step="0.1" data-s="${s}" value="${B.rates[s]??0}" aria-label="★${s} 확률"><em>%</em></div>`).join('')}</div></div>
@@ -1162,6 +1174,10 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
   const bdt=$('#bDelTop');if(bdt)bdt.addEventListener('click',()=>deleteBanner(B));
   if($('#bShare'))$('#bShare').addEventListener('click',()=>{const pl=poolOf(B);if(!pl.length){toast('배너에 뜨는 카드가 없어요');return;}openShare('banner',pl,B);});
   $$('[data-import]',M).forEach(b=>b.addEventListener('click',askImport));
+  $$('.ho [data-th]',S).forEach(t=>{const c=cards.find(x=>x.id===t.dataset.th),a=c&&heroArt(B,c);t.style.background=a?`url("${a.src}") center 22%/cover`:(c?cardBase(c):'');});
+  $$('.ho [data-hs]',S).forEach(b=>b.addEventListener('click',()=>{const c=cards.find(x=>x.id===b.dataset.hs);if(!c)return;B.hside=B.hside||{};B.hside[c.id]=heroSide(B,c)==='post'?'pre':'post';saveMeta();renderGacha();openSettings();}));
+  $$('.ho [data-mv]',S).forEach(b=>b.addEventListener('click',()=>{const L=puList(B).map(c=>c.id),i=+b.dataset.mv,j=i+(+b.dataset.d);if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];
+    B.pickup=[...L,...B.pickup.filter(id=>!L.includes(id))];saveMeta();renderGacha();openSettings();}));
   $('#bPu').addEventListener('change',e=>{B.pu=clamp(parseFloat(e.target.value)||0,0,100);saveMeta();renderGacha();openSettings();});
   $$('.pchip.pool',S).forEach(b=>{const c=cards.find(x=>x.id===b.dataset.pid),a=artFor(c,'pre');$('i',b).style.background=a?`url("${a.src}") center/cover`:cardBase(c);
     b.addEventListener('click',()=>{const L=(c.shared&&!B.only)?B.incl:B.excl,i=L.indexOf(c.id);if(i>=0)L.splice(i,1);else L.push(c.id);if(!inPool(B,c))B.pickup=B.pickup.filter(x=>x!==c.id);saveMeta();renderGacha();openSettings();});});
@@ -1179,11 +1195,11 @@ function renderGacha(){const M=$('#gMain'),S=$('#gSide'),B=meta.banner;clearFits
   $('#bHard').addEventListener('change',e=>{B.hard=Math.max(0,parseInt(e.target.value)||0);saveMeta();renderGacha();openSettings();});
   $('#resetData').addEventListener('click',()=>{if(!confirm('가챠 기록을 초기화할까요? 뽑기 기록, 보유 수, 천장, 젬이 처음으로 돌아가요. (카드와 배너는 그대로예요)'))return;
     const keep=meta.banners;meta.history=[];meta.owned={};meta.gems=defMeta().gems;keep.forEach(b=>{b.pity=0;});saveMeta();renderGems();renderGacha();toast('가챠 기록을 초기화했어요');});}
-async function exportBannerPNG(){const B=meta.banner,pu=cards.filter(c=>B.pickup.includes(c.id)),show=(pu.length?pu:[...cards].sort((a,b)=>b.stars-a.stars)).slice(0,3);
+async function exportBannerPNG(){const B=meta.banner,pu=puList(B),show=heroCards(B);
   if(!show.length){toast('배너에 넣을 카드가 없어요');return;}
   await document.fonts.ready;const W=1600,H=700,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');ctx.imageSmoothingQuality='high';
   ctx.fillStyle='#241a36';ctx.fillRect(0,0,W,H);const n=show.length,o=.07*W;
-  for(let i=0;i<n;i++){const c=show[i],a=artFor(c,'post'),im=await getImg(a);
+  for(let i=0;i<n;i++){const c=show[i],a=heroArt(B,c),im=await getImg(a);
     const L=n>1?i*W/n-(i?o/2:0):0,Wd=n>1?W/n+(i?o/2:0)+(i<n-1?o/2:0):W;
     ctx.save();ctx.beginPath();
     if(n>1){const l=i===0?0:Wd*.09,r=i===n-1?Wd:Wd*.91;ctx.moveTo(L+l,0);ctx.lineTo(L+Wd,0);ctx.lineTo(L+r,H);ctx.lineTo(L,H);}else ctx.rect(0,0,W,H);
@@ -1222,7 +1238,7 @@ async function exportResultsPNG(){const list=P.list;if(!list.length)return;await
   download(cv.toDataURL('image/png'),'가챠결과_'+new Date().toISOString().slice(0,10)+'.png');}
 function exportShare(kind,list,B){list=list.filter(c=>!c.shared&&!c.recv);if(!list.length||(kind==='banner'&&B&&B.only)){toast('공유 받은 카드는 다시 공유할 수 없어요');return;}
   const data={app:'gacha-card-maker',kind,v:1,at:Date.now(),cards:list.map(c=>{const x=clone(c);delete x.updated;return x;})};
-  if(kind==='banner')data.banner={title:B.title,sub:B.sub,pickup:B.pickup.filter(id=>list.some(c=>c.id===id)),rates:B.rates,hard:B.hard,pu:B.pu};
+  if(kind==='banner')data.banner={title:B.title,sub:B.sub,pickup:B.pickup.filter(id=>list.some(c=>c.id===id)),rates:B.rates,hard:B.hard,pu:B.pu,hside:B.hside||{}};
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'}),u=URL.createObjectURL(blob);
   const nm=(kind==='banner'?(B.title||'배너'):(list.length===1?dispName(list[0]):'카드 '+list.length+'장')).replace(/[\\/:*?"<>|]+/g,'').trim()||'gacha';
   download(u,nm+'.gacha.json');setTimeout(()=>URL.revokeObjectURL(u),15000);
@@ -1239,7 +1255,7 @@ async function importData(data){
       bBar.style.width=Math.round((i+1)/data.cards.length*100)+'%';}}
   catch(e){console.error(e);busy(false);toast('저장 공간이 부족해서 다 못 가져왔어요');refreshViews();return;}
   busy(false);
-  if(data.kind==='banner'&&data.banner){const b=Object.assign(newBanner(),{title:data.banner.title||'공유 배너',sub:data.banner.sub||'',rates:Object.assign(newBanner().rates,data.banner.rates||{}),hard:+data.banner.hard||0,pu:data.banner.pu??70,pickup:(data.banner.pickup||[]).filter(id=>ids.includes(id)),only:ids});
+  if(data.kind==='banner'&&data.banner){const b=Object.assign(newBanner(),{title:data.banner.title||'공유 배너',sub:data.banner.sub||'',rates:Object.assign(newBanner().rates,data.banner.rates||{}),hard:+data.banner.hard||0,pu:data.banner.pu??70,hside:data.banner.hside||{},pickup:(data.banner.pickup||[]).filter(id=>ids.includes(id)),only:ids});
     meta.banners.push(b);meta.cur=b.id;fixBanners();saveMeta();setView('gacha');toast(`'${b.title}' 배너를 가져왔어요 · 새 카드 ${added}장`);}
   else{saveMeta();setView('collection');toast(added?`카드 ${added}장을 가져왔어요`:'이미 가진 카드들이에요');}}
 
@@ -1267,7 +1283,7 @@ async function buildLink(kind,list,B,onStep){
   if(linkCache.has(sig))return linkCache.get(sig);
   const ids=[];for(let i=0;i<list.length;i++){onStep&&onStep(i,list.length);ids.push(await fsPut(await packCard(list[i])));}
   const main={app:'gacha-card-maker',kind,v:1,cards:ids};
-  if(kind==='banner')main.banner={title:B.title,sub:B.sub,pickup:B.pickup.filter(id=>list.some(c=>c.id===id)),rates:B.rates,hard:B.hard,pu:B.pu};
+  if(kind==='banner')main.banner={title:B.title,sub:B.sub,pickup:B.pickup.filter(id=>list.some(c=>c.id===id)),rates:B.rates,hard:B.hard,pu:B.pu,hside:B.hside||{}};
   const id=await fsPut(await packStr(main)),url=location.href.split('#')[0]+'#g='+id;linkCache.set(sig,url);return url;}
 let shareJob=null;
 function openShare(kind,list,B){if(kind==='banner'&&B&&B.only){toast('공유 받은 배너는 다시 공유할 수 없어요');return;}
