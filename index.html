@@ -207,6 +207,16 @@ textarea.inp{height:auto;min-height:64px;padding:10px 11px;line-height:1.55;resi
 .slot.has .acts{display:flex}
 .slot .acts span{font-size:10px;font-weight:600;padding:3px 7px;border-radius:5px;background:rgba(20,12,30,.6);color:#fff}
 .slot.has .plus{display:none}
+.mypresets{display:flex;flex-direction:column;gap:6px}
+.mypresets:empty{display:none}
+.mp{display:flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 8px;border-radius:9px;border:1px solid var(--line2);background:transparent;text-align:left;cursor:pointer}
+.mp:hover{background:var(--card)}
+.mp.on{border-color:var(--accent);background:var(--accent-soft)}
+.mp i{width:24px;height:24px;border-radius:50%;flex:none;box-shadow:0 0 0 1px var(--line2)}
+.mp b{flex:1;min-width:0;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp small{font-size:11px;color:var(--muted);flex:none}
+.mp .x{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;color:var(--faint);font-size:11px;flex:none}
+.mp .x:hover{background:var(--card2);color:#e2557f}
 .presets{display:flex;gap:8px;flex-wrap:wrap}
 .preset{width:26px;height:26px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line2);transition:transform .15s}
 .preset:hover{transform:scale(1.1)}
@@ -591,6 +601,11 @@ details.more summary::-webkit-details-marker{display:none}
             <div class="sec-title">테마 프리셋</div>
             <div class="presets" id="presets"></div>
           </div>
+          <div class="sec">
+            <div class="sec-title">내 프리셋<em>색 · 폰트 저장</em></div>
+            <div class="mypresets" id="myPresets"></div>
+            <button class="addline" id="savePreset">+ 지금 스타일 저장</button>
+          </div>
           <div class="sec" style="gap:4px">
             <div class="sec-title" style="margin-bottom:6px">포인트 색</div>
             <div id="colorRows"></div>
@@ -886,9 +901,24 @@ function syncForm(){
   syncColors();renderLines();
   $('#editState').textContent=draft.id?'편집 중 · '+dispName(draft):'새 카드';
   $('#saveBtn').textContent=draft.id?'✦ 변경 저장':'✦ 저장';$('#delCard').hidden=!draft.id;$('#saveAsNew').hidden=!draft.id;}
+let myPresets=[];
+const samePreset=p=>COLOR_KEYS.every(([k])=>String(p.c[k]).toLowerCase()===String(draft.colors[k]).toLowerCase())&&(p.f||'paperlogy')===draft.font;
+function renderMyPresets(){const L=$('#myPresets');L.innerHTML='';
+  myPresets.forEach(p=>{const d=document.createElement('div');d.className='mp'+(samePreset(p)?' on':'');d.setAttribute('role','button');d.tabIndex=0;
+    d.innerHTML=`<i style="background:linear-gradient(135deg,${mix(p.c.accent,'#ffffff',.55)},${p.c.accent} 55%,${p.c.starBottom})"></i><b>${esc(p.n)}</b><small>${esc((FONTS[p.f]||FONTS.paperlogy).n)}</small><span class="x" role="button" aria-label="프리셋 삭제" title="삭제">✕</span>`;
+    const apply=()=>{draft.colors=clone(p.c);if(FONTS[p.f])draft.font=p.f;syncForm();refreshPreview();toast(`'${p.n}' 스타일을 불러왔어요`);};
+    d.addEventListener('click',e=>{if(e.target.closest('.x')){if(!confirm(`'${p.n}' 프리셋을 삭제할까요?`))return;myPresets=myPresets.filter(x=>x!==p);saveMyPresets();renderMyPresets();return;}apply();});
+    d.addEventListener('keydown',e=>{if(e.key==='Enter')apply();});L.appendChild(d);});}
+const saveMyPresets=()=>DB.setK('presets',myPresets).catch(e=>console.warn(e));
+$('#savePreset').addEventListener('click',()=>{const n=prompt('프리셋 이름을 정해 주세요',`내 스타일 ${myPresets.length+1}`);if(n===null)return;
+  const name=n.trim()||`내 스타일 ${myPresets.length+1}`,ex=myPresets.find(p=>p.n===name);
+  if(ex){if(!confirm(`'${name}' 프리셋이 이미 있어요. 덮어쓸까요?`))return;ex.c=clone(draft.colors);ex.f=draft.font;}
+  else myPresets.push({id:uid(),n:name,c:clone(draft.colors),f:draft.font});
+  saveMyPresets();renderMyPresets();toast(`'${name}' 프리셋으로 저장했어요`);});
 function syncColors(){
   $$('#colorRows input').forEach(i=>{i.value=draft.colors[i.dataset.k];i.parentElement.querySelector('code').textContent=draft.colors[i.dataset.k].toUpperCase();});
-  $$('#presets .preset').forEach((b,i)=>{const p=PRESETS[i].c;b.classList.toggle('on',COLOR_KEYS.every(([k])=>p[k].toLowerCase()===String(draft.colors[k]).toLowerCase()));});}
+  $$('#presets .preset').forEach((b,i)=>{const p=PRESETS[i].c;b.classList.toggle('on',COLOR_KEYS.every(([k])=>p[k].toLowerCase()===String(draft.colors[k]).toLowerCase()));});
+  renderMyPresets();}
 let draftReady=false,draftT=null;
 function saveDraftNow(){clearTimeout(draftT);if(!draftReady)return;DB.setK('draft',{d:clone(draft),side,t:Date.now()}).catch(e=>console.warn(e));}
 const saveDraftSoon=()=>{if(!draftReady)return;clearTimeout(draftT);draftT=setTimeout(saveDraftNow,600);};
@@ -1494,6 +1524,7 @@ $('#brand').addEventListener('click',e=>{e.preventDefault();setView('studio');})
 
 (async()=>{syncForm();refreshPreview();renderGems();
   try{cards=((await DB.all())||[]).map(migrate);const m=await DB.getMeta();if(m){const d=defMeta();meta=Object.assign(d,m);if(!Array.isArray(m.banners))meta.banners=null;fixBanners();}}catch(e){console.warn(e);}
+  try{const ps=await DB.getK('presets');if(Array.isArray(ps)){myPresets=ps.filter(p=>p&&p.c);renderMyPresets();}}catch(e){console.warn(e);}
   try{const sv=await DB.getK('draft');if(sv&&sv.d){const d=migrate(sv.d);if(d.id&&!cards.some(c=>c.id===d.id)){d.id=null;d.created=null;}draft=d;side=sv.side==='post'?'post':'pre';syncForm();refreshPreview();}}catch(e){console.warn(e);}
   {const sh=new Set();meta.banners.forEach(b=>{if(b.only)b.only.forEach(id=>sh.add(id));});for(const c of cards)if(c.shared===undefined&&sh.has(c.id)){c.shared=true;DB.put(c).catch(()=>{});}}
   draftReady=true;
